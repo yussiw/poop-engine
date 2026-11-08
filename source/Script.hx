@@ -16,7 +16,6 @@ import flixel.tweens.FlxTween;
 import flixel.util.FlxColor;
 import flixel.util.FlxTimer;
 import haxe.Json;
-import hscript.Interp;
 import hscript.Parser;
 
 /**
@@ -33,7 +32,7 @@ import hscript.Parser;
  * VARIAVEIS GLOBAIS: state / game (o dono: PlayState, MainMenuState...), script, scriptName, shared (Map comum a
  *   todos os scripts), as classes do Flixel (FlxG, FlxSprite, FlxText, FlxTween, FlxEase, FlxTimer, FlxColor, ...),
  *   as da engine (Paths, Conductor, Options, Lang, Controls, Note, Strum, Character, ...), Math, Std, Reflect, Type, Json...
- *   Campos e metodos do dono sao acessiveis direto (ex.: `score`, `bf`, `health`) por causa do scriptObject.
+ *   Campos do dono podem ser LIDOS direto (ex.: `score`, `bf`, `health`); pra gravar use game.score = 5.
  * HELPERS: rgb, point, add/remove/insert, addHUD, createSprite, createText, playSound, timer, tween, image, sparrow,
  *   getText, getJson, exists, translate, option, switchState, importScript, disableScript, cancelEvent, setVar/getVar, trace.
  * IMPORT: `import flixel.text.FlxText;` / `import x.y.Classe as Outro;` funcionam (classes ja incluidas no jogo).
@@ -51,7 +50,7 @@ class Script {
 	static var globals:Map<String, Dynamic> = null;
 	static var importRe:EReg = ~/^[ \t]*import[ \t]+([A-Za-z0-9_.]+)([ \t]+as[ \t]+([A-Za-z0-9_]+))?[ \t\r]*;?[ \t\r]*$/gm;
 
-	public var interp:Interp;
+	public var interp:ScriptInterp;
 	public var name:String;
 	public var ok:Bool = false;
 	public var disabled:Bool = false;
@@ -60,7 +59,7 @@ class Script {
 	public function new(code:String, name:String, owner:Dynamic, ?extra:Map<String, Dynamic>) {
 		this.name = name;
 		this.owner = owner;
-		interp = new Interp();
+		interp = new ScriptInterp();
 		if (owner != null)
 			interp.scriptObject = owner;
 		var v = interp.variables;

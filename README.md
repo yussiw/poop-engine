@@ -58,7 +58,7 @@ Tudo e registrado em `Options.defs` (`source/Options.hx`): `downscroll`, `ghostT
 - **Splashes:** acertou **SICK** -> `images/game/splashes/default.png/.xml` ("note impact 1|2 <cor>") toca sobre o receptor. Mods trocam a imagem; `NoteSplash.skin`, `splashScale`, `splashAlpha` mudam via script.
 
 ### HScript (Script.hx) - bem mais flexivel
-- O **dono** do script (PlayState, menu...) fica em `state`/`game` e **seus campos valem direto**: `score`, `bf`, `health`, `items`, `bg`... (`score += 100`).
+- O **dono** do script (PlayState, menu...) fica em `state`/`game` e **seus campos podem ser lidos direto**: `score`, `bf`, `health`, `items`, `bg`... (pra gravar use `game.score += 100`).
 - Todas as classes comuns ja estao la: Flix* (FlxG, FlxSprite, FlxText, FlxTween, FlxEase, FlxTimer, FlxColor, FlxCamera, ...), Std/Math/Reflect/Type/Json/StringTools e as da engine
   (Paths, Options, Lang, Conductor, Controls, Note, Strum, Character, ...). `import flixel.text.FlxText;` e `import a.b.C as D;` tambem funcionam.
 - Helpers: `rgb`, `rgba`, `point`, `add/remove/insert/addHUD`, `createSprite`, `createAnimated`, `createText`, `playSound`, `playMusic`, `timer(seg, fn, vezes)`, `tween(obj, props, dur, opts)`,
