@@ -221,6 +221,8 @@ class Paths {
 	public static function clearCache():Void {
 		frameCache.clear();
 		FlxG.bitmap.clearCache();
+		if (Lang.loaded)
+			Lang.load(Lang.current); // o mod pode trazer/trocar traducoes
 	}
 
 	static function modPath(key:String):String {
@@ -236,6 +238,34 @@ class Paths {
 
 	static inline function asset(key:String):String
 		return "assets/" + key;
+
+	/** Arquivos `<dir>/*.<ext>` (so o nivel direto), no mod ativo e no jogo base, sem repetir. Retorna chaves tipo "data/states/menu/a.hx". */
+	public static function list(dir:String, ext:String):Array<String> {
+		var out:Array<String> = [];
+		var prefix = StringTools.endsWith(dir, "/") ? dir : dir + "/";
+		var suffix = "." + ext;
+		#if sys
+		if (activeMod != "") {
+			var d = modsDir() + activeMod + "/" + prefix;
+			try {
+				if (FileSystem.exists(d) && FileSystem.isDirectory(d))
+					for (n in FileSystem.readDirectory(d))
+						if (StringTools.endsWith(n, suffix) && out.indexOf(prefix + n) < 0)
+							out.push(prefix + n);
+			} catch (e:Dynamic) {}
+		}
+		#end
+		var base = "assets/" + prefix;
+		for (a in Assets.list()) {
+			if (StringTools.startsWith(a, base) && StringTools.endsWith(a, suffix) && a.indexOf("/", base.length) < 0) {
+				var k = a.substr(7);
+				if (out.indexOf(k) < 0)
+					out.push(k);
+			}
+		}
+		out.sort(function(a, b) return a < b ? -1 : 1);
+		return out;
+	}
 
 	public static function exists(key:String):Bool
 		return modPath(key) != null || Assets.exists(asset(key));

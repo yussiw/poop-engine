@@ -8,59 +8,98 @@ import flixel.text.FlxText;
 import flixel.util.FlxColor;
 
 /**
- * Opcoes: hitbox, volume, cursor de toque, luzes piscando, log do menu.
- * Deslizar cima/baixo escolhe, toque no item selecionado muda o valor,
- * deslizar pra direita (ou voltar) retorna ao menu. Tudo e salvo na hora (ver Options.hx).
+ * Opcoes em categorias (igual a Codename): primeiro a lista de categorias, depois as opcoes da categoria.
+ * Deslizar cima/baixo escolhe, toque no item selecionado abre/muda o valor, deslizar pra direita (ou voltar)
+ * sobe um nivel. Tudo e salvo na hora (ver Options.hx). Os textos vem do Lang (idioma escolhido).
+ *
+ * Mods: data/states/options.hx pode registrar opcoes/categorias novas (Options.register) em onCreate.
  */
 class OptionsState extends FlxState {
-	static inline var COUNT:Int = 5;
-
 	var grp:FlxTypedGroup<Alphabet>;
 	var cur:Int = 0;
+	var catCur:Int = 0;
+	var inCategory:Bool = false;
+	var category:String = "";
 	var leaving:Bool = false;
+	var entries:Array<String> = [];
+	var title:FlxText;
+	var hint:FlxText;
+	var desc:FlxText;
+	var scripts:StateScript;
 
 	override function create():Void {
 		super.create();
+		scripts = new StateScript(this, "options");
+		scripts.call("onCreate");
 		if (FlxG.sound.music == null || !FlxG.sound.music.playing)
 			FlxG.sound.playMusic(Paths.music("freakyMenu"), 0.7);
 
 		var bg = new FlxSprite(0, 0, Paths.image("menus/menuDesat"));
 		bg.color = 0xFFEA71FD;
-		bg.antialiasing = true;
+		bg.antialiasing = Options.antialiasing;
 		add(bg);
 
 		grp = new FlxTypedGroup<Alphabet>();
 		add(grp);
-		for (i in 0...COUNT) {
+
+		title = new FlxText(10, 8, FlxG.width - 20, "", 28);
+		title.setFormat(Paths.font("vcr.ttf"), 28, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		add(title);
+
+		hint = new FlxText(10, FlxG.height - 30, FlxG.width - 20, "", 18);
+		hint.setFormat(Paths.font("vcr.ttf"), 18, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		add(hint);
+
+		desc = new FlxText(10, FlxG.height - 62, FlxG.width - 20, "", 20);
+		desc.setFormat(Paths.font("vcr.ttf"), 20, 0xFFFFFF99, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		add(desc);
+
+		build(true);
+		scripts.call("onCreatePost");
+	}
+
+	// ------------------------------------------------------------------ montagem
+	function catName(c:String):String
+		return Lang.get("cat." + c, c);
+
+	function optionLabel(d:OptionDef):String
+		return Lang.get("opt." + d.id, d.name != null ? Lang.get(d.name) : d.id) + ": " + Options.valueText(d);
+
+	function build(snap:Bool = false):Void {
+		for (a in grp.members)
+			if (a != null)
+				a.destroy();
+		grp.clear();
+		entries = [];
+		if (!inCategory) {
+			for (c in Options.categories)
+				if (Options.ofCategory(c).length > 0)
+					entries.push(c);
+			title.text = Lang.get("options.title");
+			hint.text = Lang.get("options.hint.category");
+		} else {
+			for (d in Options.ofCategory(category))
+				entries.push(d.id);
+			title.text = Lang.get("options.title") + " > " + catName(category).toUpperCase();
+			hint.text = Lang.get("options.hint");
+		}
+		for (i in 0...entries.length) {
 			var a = new Alphabet(0, 70 * i + 30, label(i));
 			a.isMenuItem = true;
 			a.targetY = i;
 			grp.add(a);
 		}
-
-		var title = new FlxText(10, 8, FlxG.width - 20, "OPCOES", 28);
-		title.setFormat(Paths.font("vcr.ttf"), 28, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		add(title);
-
-		var hint = new FlxText(10, FlxG.height - 30, FlxG.width - 20, "cima/baixo = escolher | toque = mudar | direita = voltar", 18);
-		hint.setFormat(Paths.font("vcr.ttf"), 18, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		add(hint);
-
+		cur = Std.int(Math.min(cur, entries.length - 1));
 		change(0);
+		if (snap)
+			for (a in grp.members) {
+				a.y = a.targetY * 1.3 * 120 + FlxG.height * 0.48;
+				a.x = a.targetY * 20 + 90;
+			}
 	}
 
-	function label(i:Int):String {
-		return switch (i) {
-			case 0: "hitbox: " + onOff(Controls.showHitbox);
-			case 1: "volume: " + (Options.volume10 * 10);
-			case 2: "cursor: " + onOff(Options.touchCursor);
-			case 3: "flash: " + onOff(Options.flashing);
-			default: "log: " + onOff(Options.menuLog);
-		}
-	}
-
-	inline function onOff(v:Bool):String
-		return v ? "on" : "off";
+	function label(i:Int):String
+		return inCategory ? optionLabel(Options.find(entries[i])) : catName(entries[i]);
 
 	/** O Alphabet nao troca de texto: recria o item na mesma posicao. */
 	function refresh(i:Int):Void {
@@ -75,45 +114,66 @@ class OptionsState extends FlxState {
 	}
 
 	function change(c:Int):Void {
+		if (entries.length == 0)
+			return;
 		if (c != 0)
 			FlxG.sound.play(Paths.sfx("menu/scroll"), 0.4);
-		cur = (cur + c + COUNT) % COUNT;
+		cur = (cur + c + entries.length) % entries.length;
 		var n = 0;
 		for (a in grp.members) {
 			a.targetY = n - cur;
 			a.alpha = a.targetY == 0 ? 1 : 0.6;
 			n++;
 		}
+		if (inCategory) {
+			var d = Options.find(entries[cur]);
+			desc.text = Lang.get("opt." + d.id + ".desc", d.desc != null ? Lang.get(d.desc) : "");
+		} else
+			desc.text = "";
+		scripts.call("onChange", [cur, entries[cur]]);
 	}
 
-	function toggle(i:Int):Void {
-		switch (i) {
-			case 0:
-				Options.setHitbox(!Controls.showHitbox);
-			case 1:
-				Options.setVolume((Options.volume10 + 1) % 11);
-			case 2:
-				Options.setTouchCursor(!Options.touchCursor);
-			case 3:
-				Options.setFlashing(!Options.flashing);
-			default:
-				Options.setMenuLog(!Options.menuLog);
+	function accept(i:Int):Void {
+		if (!inCategory) {
+			if (scripts.call("onOpenCategory", [entries[i]]))
+				return;
+			catCur = cur;
+			category = entries[i];
+			inCategory = true;
+			cur = 0;
+			FlxG.sound.play(Paths.sfx("menu/scroll"), 0.6);
+			build(true);
+			return;
 		}
+		var d = Options.find(entries[i]);
+		Options.cycle(d);
+		scripts.call("onOptionChanged", [d.id, Options.get(d.id)]);
 		FlxG.sound.play(Paths.sfx("menu/scroll"), 0.6);
+		if (d.id == "language") {
+			build(); // todos os textos mudam de idioma
+			return;
+		}
 		refresh(i);
 	}
 
 	function back():Void {
 		if (leaving)
 			return;
-		leaving = true;
 		FlxG.sound.play(Paths.sfx("menu/cancel"), 0.6);
+		if (inCategory) {
+			inCategory = false;
+			cur = catCur;
+			build(true);
+			return;
+		}
+		leaving = true;
 		TransitionSubState.go(new MainMenuState());
 	}
 
 	override function update(elapsed:Float):Void {
 		Controls.update();
 		super.update(elapsed);
+		scripts.call("onUpdate", [elapsed]);
 		if (leaving)
 			return;
 		if (Controls.swipeRight || Controls.back) {
@@ -129,7 +189,7 @@ class OptionsState extends FlxState {
 				var a = grp.members[i];
 				if (Controls.tapY > a.y - 10 && Controls.tapY < a.y + 95) {
 					if (i == cur)
-						toggle(i);
+						accept(i);
 					else {
 						cur = i;
 						change(0);
@@ -139,5 +199,11 @@ class OptionsState extends FlxState {
 				}
 			}
 		}
+		scripts.call("onUpdatePost", [elapsed]);
+	}
+
+	override function destroy():Void {
+		scripts.call("onDestroy");
+		super.destroy();
 	}
 }

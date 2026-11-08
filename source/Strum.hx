@@ -17,7 +17,7 @@ class Strum extends FlxSprite {
 		animation.addByPrefix("confirm", d + " confirm", 24, false);
 		scale.set(Note.SCALE, Note.SCALE);
 		updateHitbox();
-		antialiasing = true;
+		antialiasing = Options.antialiasing;
 		play("static");
 	}
 

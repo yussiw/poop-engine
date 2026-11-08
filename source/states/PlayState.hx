@@ -36,6 +36,9 @@ class PlayState extends FlxState {
 	public var voices:FlxSound;
 	public var notes:FlxTypedGroup<Note>;
 	public var sustains:FlxTypedGroup<FlxSprite>;
+	public var splashes:FlxTypedGroup<NoteSplash>;
+	/** true = notas descem (opcao downscroll) */
+	public var downscroll:Bool = false;
 	public var playerStrums:Array<Strum> = [];
 	public var oppStrums:Array<Strum> = [];
 
@@ -43,6 +46,7 @@ class PlayState extends FlxState {
 	var total:Int = 0;
 	var unspawn:Array<NoteData> = [];
 	var hitbox:Array<FlxSprite> = [];
+	var camTop:FlxCamera;
 	var healthBar:FlxBar;
 	var iconP1:FlxSprite;
 	var iconP2:FlxSprite;
@@ -53,12 +57,13 @@ class PlayState extends FlxState {
 	var dead:Bool = false;
 	var lastTime:Float = -1;
 	var curStep:Int = -9999;
-	var scripts:Array<Script> = [];
+	public var scripts:Array<Script> = [];
 	var pxMs:Float = 0.9;
 
 	override function create():Void {
 		super.create();
 		instance = this;
+		downscroll = Options.downscroll;
 		if (FlxG.sound.music != null)
 			FlxG.sound.music.stop();
 
@@ -85,6 +90,8 @@ class PlayState extends FlxState {
 		var front:Array<FlxSprite> = [];
 		var objs:Array<Dynamic> = st.objects;
 		for (o in objs) {
+			if (Options.lowQuality && o.lowQuality == false)
+				continue;
 			var g = Paths.image(o.image);
 			if (g == null)
 				continue;
@@ -95,7 +102,7 @@ class PlayState extends FlxState {
 				s.scale.set(o.scale, o.scale);
 				s.updateHitbox();
 			}
-			s.antialiasing = true;
+			s.antialiasing = Options.antialiasing;
 			if (o.front == true)
 				front.push(s);
 			else
@@ -130,23 +137,33 @@ class PlayState extends FlxState {
 		if (Controls.showHitbox) {
 			var stripW = FlxG.width / 4;
 			var lc = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
+			// camera propria, criada DEPOIS da camHUD: o Flixel desenha as cameras na ordem em
+			// que foram adicionadas, entao tudo que estiver nela fica na frente de qualquer
+			// coisa (mundo, HUD, setas, notas, popups, sprites de script). Ela nao da zoom,
+			// entao as faixas tambem nao pulsam com o beat.
+			camTop = new FlxCamera();
+			camTop.bgColor = FlxColor.TRANSPARENT;
+			FlxG.cameras.add(camTop, false);
 			for (i in 0...4) {
 				var h = new FlxSprite(stripW * i, 0).makeGraphic(Std.int(stripW), FlxG.height, lc[i]);
 				h.alpha = 0;
-				h.cameras = [camHUD];
+				h.scrollFactor.set(0, 0);
+				h.cameras = [camTop];
 				hitbox.push(h);
 				add(h);
 			}
 		}
 		// layout igual ao da Kade/vanilla: oponente na esquerda, jogador na direita
 		for (i in 0...4) {
-			var o = new Strum(50 + Note.WIDTH * i, 50, i);
-			var p = new Strum(50 + Note.WIDTH * i + FlxG.width / 2, 50, i);
+			var sy:Float = downscroll ? FlxG.height - 150 : 50;
+			var o = new Strum(50 + Note.WIDTH * i, sy, i);
+			var p = new Strum(50 + Note.WIDTH * i + FlxG.width / 2, sy, i);
+			var slide:Float = downscroll ? -10 : 10;
 			for (st in [o, p]) {
 				st.cameras = [camHUD];
-				st.y -= 10;
+				st.y -= slide;
 				st.alpha = 0;
-				FlxTween.tween(st, {y: st.y + 10, alpha: 1}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + 0.2 * i});
+				FlxTween.tween(st, {y: st.y + slide, alpha: 1}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + 0.2 * i});
 				add(st);
 			}
 			oppStrums.push(o);
@@ -154,13 +171,16 @@ class PlayState extends FlxState {
 		}
 		sustains = new FlxTypedGroup<FlxSprite>();
 		notes = new FlxTypedGroup<Note>();
+		splashes = new FlxTypedGroup<NoteSplash>();
 		sustains.cameras = [camHUD];
 		notes.cameras = [camHUD];
+		splashes.cameras = [camHUD];
 		add(sustains);
 		add(notes);
+		add(splashes);
 		loadNotes();
 
-		var hbBG = new FlxSprite(0, FlxG.height * 0.9, Paths.image("game/healthBar"));
+		var hbBG = new FlxSprite(0, downscroll ? FlxG.height * 0.1 : FlxG.height * 0.9, Paths.image("game/healthBar"));
 		hbBG.screenCenter(X);
 		hbBG.cameras = [camHUD];
 		add(hbBG);
@@ -194,17 +214,20 @@ class PlayState extends FlxState {
 	// ------------------------------------------------------------------ carregamento
 	function loadScripts():Void {
 		var stageName:String = chart.stage != null ? chart.stage : "default";
-		for (p in ["scripts/global.hx", 'stages/$stageName.hx', 'songs/$songId/script.hx', 'songs/$songId/modchart.hx']) {
+		var paths:Array<String> = ["scripts/global.hx"];
+		paths = paths.concat(Paths.list("scripts/global", "hx"));
+		paths = paths.concat(['stages/$stageName.hx', 'songs/$songId/script.hx', 'songs/$songId/modchart.hx']);
+		paths = paths.concat(Paths.list('songs/$songId/scripts', "hx"));
+		for (p in paths) {
 			var code = Paths.getText(p);
 			if (code != null)
 				scripts.push(new Script(code, p, this));
 		}
 	}
 
-	public function callScript(fn:String, ?args:Array<Dynamic>):Void {
-		for (s in scripts)
-			s.call(fn, args);
-	}
+	/** Chama `fn` em todos os scripts. Retorna true se algum chamou cancelEvent() (o PlayState pula o comportamento padrao). */
+	public function callScript(fn:String, ?args:Array<Dynamic>):Bool
+		return Script.callAll(scripts, fn, args);
 
 	function loadNotes():Void {
 		var secs:Array<Dynamic> = chart.notes;
@@ -234,11 +257,14 @@ class PlayState extends FlxState {
 	}
 
 	function endSong():Void {
+		if (callScript("onSongEnd"))
+			return;
 		Highscore.save(songId, score);
 		TransitionSubState.go(new FreeplayState());
 	}
 
 	override function openSubState(s:flixel.FlxSubState):Void {
+		callScript(dead ? "onGameOver" : "onPause");
 		if (started && !dead) {
 			inst.pause();
 			if (voices != null)
@@ -249,6 +275,7 @@ class PlayState extends FlxState {
 
 	override function closeSubState():Void {
 		super.closeSubState();
+		callScript("onResume");
 		if (started && !dead) {
 			inst.resume();
 			if (voices != null)
@@ -297,12 +324,16 @@ class PlayState extends FlxState {
 			notes.add(n);
 			if (n.sustain != null)
 				sustains.add(n.sustain);
+			if (n.tail != null)
+				sustains.add(n.tail);
+			callScript("onNoteSpawn", [n]);
 		}
 
 		handleInput();
 		updateNotes(elapsed);
 		updateHud(elapsed);
 		callScript("onUpdate", [elapsed]);
+		callScript("onUpdatePost", [elapsed]);
 
 		if (health <= 0 && !dead) {
 			dead = true;
@@ -330,7 +361,7 @@ class PlayState extends FlxState {
 			bf.danceIfIdle();
 			dad.danceIfIdle();
 		}
-		if (b >= 0 && b % 4 == 0) {
+		if (b >= 0 && b % 4 == 0 && Options.camZooming) {
 			FlxG.camera.zoom += 0.015;
 			camHUD.zoom += 0.03;
 		}
@@ -340,6 +371,8 @@ class PlayState extends FlxState {
 	}
 
 	function countdown(i:Int):Void {
+		if (callScript("onCountdown", [i]))
+			return;
 		var snd = ["intro3", "intro2", "intro1", "introGo"];
 		var img = [null, "ready", "set", "go"];
 		var s = Paths.sfx(snd[i]);
@@ -363,6 +396,8 @@ class PlayState extends FlxState {
 	}
 
 	function moveCam(mustHit:Bool):Void {
+		if (callScript("onCameraMove", [mustHit]))
+			return;
 		if (mustHit) {
 			var m = bf.getMidpoint();
 			camFollow.setPosition(m.x - 100, m.y - 100);
@@ -388,17 +423,37 @@ class PlayState extends FlxState {
 				}
 				if (target != null)
 					goodHit(target);
-				else
+				else if (Options.ghostTapping)
 					strum.play("press"); // ghost tapping
+				else {
+					strum.play("press");
+					callScript("onGhostTap", [i]);
+					ghostMiss(i);
+				}
 			}
 			if (Controls.released[i])
 				strum.play("static");
 		}
 	}
 
+	/** erro por tocar sem nota (ghost tapping desligado) */
+	function ghostMiss(lane:Int):Void {
+		health -= 0.04;
+		combo = 0;
+		misses++;
+		score -= 10;
+		bf.sing(lane, true);
+		if (voices != null)
+			voices.volume = 0;
+		FlxG.sound.play(Paths.sfx("missnote" + FlxG.random.int(1, 3)), 0.2);
+		updateScore();
+	}
+
 	function goodHit(n:Note):Void {
 		var diff = Math.abs(n.strumTime - Conductor.songPosition);
 		var r = diff <= 45 ? "sick" : (diff <= 90 ? "good" : (diff <= 135 ? "bad" : "shit"));
+		if (callScript("onNoteHitPre", [n, r]))
+			return;
 		var pts = switch (r) {
 			case "sick": 350;
 			case "good": 200;
@@ -427,12 +482,16 @@ class PlayState extends FlxState {
 		if (voices != null)
 			voices.volume = 1;
 		popup(r);
+		if (r == "sick")
+			spawnSplash(n, playerStrums[n.lane]);
 		updateScore();
 		callScript("onNoteHit", [n, r]);
 	}
 
 	function missNote(n:Note):Void {
 		n.tooLate = true;
+		if (callScript("onMissPre", [n]))
+			return;
 		health -= 0.0475;
 		combo = 0;
 		misses++;
@@ -444,6 +503,17 @@ class PlayState extends FlxState {
 		FlxG.sound.play(Paths.sfx("missnote" + FlxG.random.int(1, 3)), 0.2);
 		updateScore();
 		callScript("onMiss", [n]);
+	}
+
+	/** splash de nota SICK (opcao splashes). Scripts: onSplash(splash, note), cancelEvent() cancela. */
+	public function spawnSplash(n:Note, strum:Strum):Void {
+		if (!Options.splashes || Options.lowQuality)
+			return;
+		var sp:NoteSplash = splashes.recycle(NoteSplash);
+		sp.revive();
+		sp.setup(strum, n.lane);
+		if (callScript("onSplash", [sp, n]))
+			sp.kill();
 	}
 
 	function opponentHit(n:Note):Void {
@@ -465,7 +535,7 @@ class PlayState extends FlxState {
 			var end = n.strumTime + n.sustainLength;
 			n.x = strum.x + (strum.width - n.width) / 2;
 			if (!n.wasHit)
-				n.y = strum.y + (n.strumTime - Conductor.songPosition) * pxMs;
+				n.y = strum.y + (n.strumTime - Conductor.songPosition) * pxMs * (downscroll ? -1 : 1);
 			n.visible = !n.wasHit;
 			n.alpha = n.tooLate ? 0.35 : 1;
 
@@ -495,7 +565,7 @@ class PlayState extends FlxState {
 				}
 				if (Conductor.songPosition >= end)
 					kill.push(n);
-			} else if (n.tooLate && Conductor.songPosition - end > (strum.y + 200) / pxMs)
+			} else if (n.tooLate && Conductor.songPosition - end > (downscroll ? FlxG.height - strum.y + 200 : strum.y + 200) / pxMs)
 				kill.push(n);
 		}
 		for (n in kill) {
@@ -504,35 +574,64 @@ class PlayState extends FlxState {
 				sustains.remove(n.sustain, true);
 				n.sustain.destroy();
 			}
+			if (n.tail != null) {
+				sustains.remove(n.tail, true);
+				n.tail.destroy();
+			}
 			n.destroy();
 		}
 	}
 
+	/**
+	 * Monta o sustain: corpo esticado + cauda ("hold end") na ponta. Upscroll: o sustain vai do centro da nota
+	 * pra baixo; downscroll: pra cima (a cauda vira de ponta cabeca). Depois de acertada, o comeco gruda no receptor.
+	 */
 	function layoutSustain(n:Note, strum:Strum, end:Float):Void {
 		var s = n.sustain;
-		var top:Float;
+		var t = n.tail;
+		var center:Float;
 		var len:Float;
 		if (n.wasHit) {
-			top = strum.y + strum.height / 2;
+			center = strum.y + strum.height / 2;
 			len = (end - Conductor.songPosition) * pxMs;
 		} else {
-			top = n.y + n.height / 2;
+			center = n.y + n.height / 2;
 			len = n.sustainLength * pxMs;
 		}
+		var a = n.tooLate ? 0.25 : 0.6;
 		if (len <= 2) {
 			s.visible = false;
+			if (t != null)
+				t.visible = false;
 			return;
 		}
-		s.visible = true;
-		s.alpha = n.tooLate ? 0.25 : 0.6;
-		s.scale.y = len / s.frameHeight;
-		s.updateHitbox();
-		s.x = n.x + (n.width - s.width) / 2;
-		s.y = top;
+		var tailBase:Float = t == null ? 0 : t.frameHeight * Note.SCALE;
+		var tailLen:Float = Math.min(tailBase, len);
+		var pieceLen:Float = len - tailLen;
+
+		s.visible = pieceLen > 0.5;
+		if (s.visible) {
+			s.alpha = a;
+			s.scale.y = (pieceLen + 1) / s.frameHeight;
+			s.updateHitbox();
+			s.x = n.x + (n.width - s.width) / 2;
+			s.y = downscroll ? center - pieceLen - 1 : center;
+		}
+		if (t != null) {
+			t.visible = true;
+			t.alpha = a;
+			t.flipY = downscroll;
+			t.scale.set(Note.SCALE, Note.SCALE * tailLen / tailBase);
+			t.updateHitbox();
+			t.x = n.x + (n.width - t.width) / 2;
+			t.y = downscroll ? center - pieceLen - tailLen : center + pieceLen;
+		}
 	}
 
 	// ------------------------------------------------------------------ HUD
 	function popup(r:String):Void {
+		if (callScript("onPopup", [r]))
+			return;
 		var coolX = FlxG.width * 0.55 - 125;
 		var parts:Array<FlxSprite> = [];
 		var rating = new FlxSprite(0, 0, Paths.image('game/score/$r'));
@@ -544,7 +643,7 @@ class PlayState extends FlxState {
 		rating.velocity.x -= FlxG.random.int(0, 10);
 		rating.setGraphicSize(Std.int(rating.width * 0.7));
 		rating.updateHitbox();
-		rating.antialiasing = true;
+		rating.antialiasing = Options.antialiasing;
 		parts.push(rating);
 		if (combo >= 10) {
 			var comboSpr = new FlxSprite(0, 0, Paths.image("game/score/combo"));
@@ -556,7 +655,7 @@ class PlayState extends FlxState {
 			comboSpr.velocity.x += FlxG.random.int(1, 10);
 			comboSpr.setGraphicSize(Std.int(comboSpr.width * 0.7));
 			comboSpr.updateHitbox();
-			comboSpr.antialiasing = true;
+			comboSpr.antialiasing = Options.antialiasing;
 			parts.push(comboSpr);
 			var cs = Std.string(combo);
 			while (cs.length < 3)
@@ -568,7 +667,7 @@ class PlayState extends FlxState {
 				num.y += 80;
 				num.setGraphicSize(Std.int(num.width * 0.5));
 				num.updateHitbox();
-				num.antialiasing = true;
+				num.antialiasing = Options.antialiasing;
 				num.acceleration.y = FlxG.random.int(200, 300);
 				num.velocity.y -= FlxG.random.int(140, 160);
 				num.velocity.x = FlxG.random.float(-5, 5);
@@ -590,7 +689,7 @@ class PlayState extends FlxState {
 
 	function updateScore():Void {
 		var acc = total > 0 ? hits / total * 100 : 0;
-		scoreTxt.text = 'Score:$score | Combo Breaks:$misses | Accuracy:' + FlxMath.roundDecimal(acc, 2) + '%';
+		scoreTxt.text = Lang.get("game.score") + ':$score | ' + Lang.get("game.breaks") + ':$misses | ' + Lang.get("game.accuracy") + ':' + FlxMath.roundDecimal(acc, 2) + '%';
 	}
 
 	function updateHud(elapsed:Float):Void {
@@ -614,6 +713,7 @@ class PlayState extends FlxState {
 	}
 
 	override function destroy():Void {
+		callScript("onDestroy");
 		instance = null;
 		super.destroy();
 	}

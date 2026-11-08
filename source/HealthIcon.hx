@@ -16,7 +16,7 @@ class HealthIcon extends FlxSprite {
 		animation.add("l", [two ? 1 : 0], 0, false);
 		animation.play("n");
 		flipX = isPlayer;
-		antialiasing = true;
+		antialiasing = Options.antialiasing;
 		scrollFactor.set();
 	}
 

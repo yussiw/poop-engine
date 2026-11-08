@@ -31,7 +31,7 @@ class Character extends FlxSprite {
 			d = Paths.json('data/characters/bf.json');
 
 		frames = Paths.sparrow(d.image);
-		antialiasing = true;
+		antialiasing = Options.antialiasing;
 		if (d.scale != null) {
 			scale.set(d.scale, d.scale);
 			updateHitbox();

@@ -22,7 +22,7 @@ class ChartPickState extends FlxState {
 
 		var bg = new FlxSprite(0, 0, Paths.image("menus/menuDesat"));
 		bg.color = 0xFF55AA77;
-		bg.antialiasing = true;
+		bg.antialiasing = Options.antialiasing;
 		add(bg);
 
 		var list:Array<Dynamic> = Paths.json("data/songlist.json");
@@ -46,12 +46,12 @@ class ChartPickState extends FlxState {
 		var mod = Paths.currentMod();
 		var top = new FlxText(16, 12, FlxG.width - 32, "Editor de chart - Mod: " + (mod == "" ? "(base)" : mod), 22);
 		top.setFormat(Paths.font("vcr.ttf"), 22, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		top.antialiasing = true;
+		top.antialiasing = Options.antialiasing;
 		add(top);
 
 		var hint = new FlxText(16, 0, FlxG.width - 32, "", 16);
 		hint.setFormat(Paths.font("vcr.ttf"), 16, mod == "" ? 0xFFFFE066 : FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		hint.antialiasing = true;
+		hint.antialiasing = Options.antialiasing;
 		hint.text = (mod == "" ? "Atencao: nenhum mod ativo, entao nao da pra salvar. Escolha um mod no menu principal (deslize pra esquerda).\n" : "")
 			+ "Cima/baixo: escolher | Toque no selecionado: abrir | Direita: voltar";
 		hint.y = FlxG.height - hint.height - 6;

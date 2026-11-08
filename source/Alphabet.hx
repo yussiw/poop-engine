@@ -16,8 +16,22 @@ class Alphabet extends FlxSpriteGroup {
 	];
 	static final NUMS:Array<String> = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 
+	/** A fonte bold nao tem acentos: troca por letra sem acento (vira "opcoes" etc.). */
+	public static function plain(t:String):String {
+		var from = "áàâãäéèêëíìîïóòôõöúùûüçñ";
+		var to = "aaaaaeeeeiiiiooooouuuucn";
+		var out = new StringBuf();
+		for (i in 0...t.length) {
+			var c = t.charAt(i);
+			var k = from.indexOf(c.toLowerCase());
+			out.add(k >= 0 ? to.charAt(k) : c);
+		}
+		return out.toString();
+	}
+
 	public function new(x:Float, y:Float, text:String) {
 		super(x, y);
+		text = plain(text);
 		var xPos:Float = 0;
 		for (i in 0...text.length) {
 			var c = text.charAt(i).toLowerCase();
@@ -40,7 +54,7 @@ class Alphabet extends FlxSpriteGroup {
 			l.animation.addByIndices("a", "character-" + name, [0], "", 24, false);
 			l.animation.play("a");
 			l.updateHitbox();
-			l.antialiasing = true;
+			l.antialiasing = Options.antialiasing;
 			add(l);
 			xPos += l.width;
 		}

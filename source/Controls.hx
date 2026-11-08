@@ -1,6 +1,8 @@
 package;
 
+import flixel.FlxCamera;
 import flixel.FlxG;
+import flixel.math.FlxPoint;
 
 /**
  * Input unificado. Chame Controls.update() no comeco do update() de cada state.
@@ -32,6 +34,21 @@ class Controls {
 	public static var back:Bool = false;
 
 	static var starts:Map<Int, {x:Float, y:Float}> = new Map();
+
+	/**
+	 * Camera "neutra" (zoom 1, posicao 0,0) so pra converter toque -> coordenada de tela.
+	 * t.screenX / FlxG.mouse.screenX sao calculados em relacao a FlxG.camera, e o PlayState muda o zoom
+	 * dela (stage zoom 0.9 + pulso do beat). Com isso o x do toque era esticado a partir do centro e a faixa
+	 * lida ficava errada (tocava no "baixo" e lia "esquerda"). Usando uma camera sem zoom o x fica puro.
+	 */
+	static var neutralCam:FlxCamera;
+	static var tmp:FlxPoint = FlxPoint.get();
+
+	static function getNeutralCam():FlxCamera {
+		if (neutralCam == null)
+			neutralCam = new FlxCamera(0, 0, FlxG.width, FlxG.height, 1);
+		return neutralCam;
+	}
 	static var now:Array<Bool> = [false, false, false, false];
 
 	public static function update():Void {
@@ -39,11 +56,14 @@ class Controls {
 		for (i in 0...4)
 			now[i] = false;
 
-		for (t in FlxG.touches.list)
-			pointer(t.touchPointID, t.screenX, t.screenY, t.justPressed, t.pressed, t.justReleased);
+		for (t in FlxG.touches.list) {
+			t.getScreenPosition(getNeutralCam(), tmp);
+			pointer(t.touchPointID, tmp.x, tmp.y, t.justPressed, t.pressed, t.justReleased);
+		}
 
 		#if !mobile
-		pointer(-1, FlxG.mouse.screenX, FlxG.mouse.screenY, FlxG.mouse.justPressed, FlxG.mouse.pressed, FlxG.mouse.justReleased);
+		FlxG.mouse.getScreenPosition(getNeutralCam(), tmp);
+		pointer(-1, tmp.x, tmp.y, FlxG.mouse.justPressed, FlxG.mouse.pressed, FlxG.mouse.justReleased);
 		var k = FlxG.keys.pressed;
 		if (k.D) now[0] = true;
 		if (k.F) now[1] = true;

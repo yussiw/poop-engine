@@ -2,7 +2,7 @@
 <!--
 Created with Funkin Packer v0.1.3 https://neeeoo.github.io/funkin-packer/
 -->
-<TextureAtlas imagePath="radioCrank.png" width="1328" height="117">
+<TextureAtlas imagePath="check.png" width="1328" height="117">
 	<SubTexture name="Radio Selected Static0000" x="514" y="1" width="102" height="102" frameX="-0" frameY="-0" frameWidth="102" frameHeight="102"/>
 	<SubTexture name="Radio deselect animation0000" x="954" y="1" width="86" height="108" frameX="-22" frameY="-0" frameWidth="138" frameHeight="127"/>
 	<SubTexture name="Radio deselect animation0001" x="954" y="1" width="86" height="108" frameX="-22" frameY="-0" frameWidth="138" frameHeight="127"/>

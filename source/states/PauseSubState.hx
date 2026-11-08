@@ -13,7 +13,7 @@ import flixel.util.FlxColor;
 /** Pausa igual a da Kade: fundo preto 0.6, nome da musica/dificuldade no canto, Alphabet com Resume / Restart Song / Exit to menu. */
 class PauseSubState extends FlxSubState {
 	var cam:FlxCamera;
-	var names:Array<String> = ["Resume", "Restart Song", "Exit to menu"];
+	var names:Array<String> = [];
 	var items:FlxTypedGroup<Alphabet>;
 	var sel:Int = 0;
 	var lock:Float = 0.4;
@@ -25,13 +25,14 @@ class PauseSubState extends FlxSubState {
 
 	override function create():Void {
 		super.create();
+		names = [Lang.get("pause.resume"), Lang.get("pause.restart"), Lang.get("pause.exit")];
 		var bg = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		bg.alpha = 0;
 		bg.cameras = [cam];
 		add(bg);
 
 		var info = new FlxText(20, 15, 0, PlayState.instance.songName, 32);
-		var diff = new FlxText(20, 15 + 32, 0, "NORMAL", 32);
+		var diff = new FlxText(20, 15 + 32, 0, Lang.get("pause.difficulty"), 32);
 		for (t in [info, diff]) {
 			t.setFormat(Paths.font("vcr.ttf"), 32);
 			t.updateHitbox();

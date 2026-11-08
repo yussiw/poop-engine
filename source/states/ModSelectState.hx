@@ -25,7 +25,7 @@ class ModSelectState extends FlxState {
 
 		var bg = new FlxSprite(0, 0, Paths.image("menus/menuDesat"));
 		bg.color = 0xFF9271FD;
-		bg.antialiasing = true;
+		bg.antialiasing = Options.antialiasing;
 		add(bg);
 
 		names = [""].concat(Paths.listMods());
@@ -49,7 +49,7 @@ class ModSelectState extends FlxState {
 
 		var hint = new FlxText(10, FlxG.height - 52, FlxG.width - 20, "", 18);
 		hint.setFormat(Paths.font("vcr.ttf"), 18, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		hint.text = "cima/baixo = escolher | toque no selecionado = aplicar\ndireita = voltar | esquerda = recarregar lista\n" + Paths.modsDir();
+		hint.text = Lang.get("mods.hint") + Paths.modsDir();
 		hint.y = FlxG.height - hint.height - 6;
 		add(hint);
 
@@ -67,7 +67,7 @@ class ModSelectState extends FlxState {
 			n++;
 		}
 		var act = Paths.currentMod();
-		activeTxt.text = "MOD ATIVO: " + (act == "" ? "(base)" : act) + (names.length == 1 ? "   -   nenhum mod encontrado" : "");
+		activeTxt.text = Lang.get("mods.active") + (act == "" ? Lang.get("mods.base") : act) + (names.length == 1 ? Lang.get("mods.none") : "");
 	}
 
 	function accept():Void {

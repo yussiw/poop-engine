@@ -46,6 +46,36 @@ Cada mod e uma **subpasta** dentro de `mods/`, com a mesma estrutura de `assets/
 - **Mod template:** `example_mods/TemplateMod` (musica nova com `Inst.ogg`, personagem, stage, fundo do Freeplay e script). Copie a pasta inteira pra `mods/`; o `LEIA-ME.txt` dentro explica cada arquivo.
 - Tem um mod de teste em `example_mods/ExampleMod` (copie a pasta inteira pra `mods/`).
 
+### Opcoes (categorias, como na Codename)
+Menu principal -> Opcoes -> escolha a categoria (**jogabilidade**, **graficos**, **interface**, **controles**, **idioma**).
+Tudo e registrado em `Options.defs` (`source/Options.hx`): `downscroll`, `ghostTapping`, `splashes`, `camZooming`, `antialiasing`, `lowQuality`, `fps` (30-144),
+`fpsCounter`, `flashing`, `menuLog`, `volume`, `hitbox`, `touchCursor`, `language`. Salvo em `FlxG.save.data.opts` (as chaves antigas sao migradas sozinhas).
+- Scripts e mods leem com `option("id")` / `Options.get("id")` e criam opcoes novas com `Options.register({id, category, type: "bool"|"int"|"choice", def, ...})`
+  (veja `example_mods/ScriptExample/data/states/options.hx`).
+- **Idioma:** `assets/data/lang/pt-BR.json` e `en-US.json` (`Lang.get("chave")`). Chave faltando cai no en-US. Um mod pode trazer `data/lang/<id>.json`
+  (e `Lang.available.push("<id>")` num script) pra adicionar um idioma. A fonte bold do Alphabet nao tem acento, entao nos itens grandes ele e tirado sozinho (opcoes -> opcoes).
+- **Downscroll:** inverte setas, notas e HUD. Os sustains ganham a **cauda** (`hold end`) na ponta, inclusive de ponta cabeca no downscroll.
+- **Splashes:** acertou **SICK** -> `images/game/splashes/default.png/.xml` ("note impact 1|2 <cor>") toca sobre o receptor. Mods trocam a imagem; `NoteSplash.skin`, `splashScale`, `splashAlpha` mudam via script.
+
+### HScript (Script.hx) - bem mais flexivel
+- O **dono** do script (PlayState, menu...) fica em `state`/`game` e **seus campos valem direto**: `score`, `bf`, `health`, `items`, `bg`... (`score += 100`).
+- Todas as classes comuns ja estao la: Flix* (FlxG, FlxSprite, FlxText, FlxTween, FlxEase, FlxTimer, FlxColor, FlxCamera, ...), Std/Math/Reflect/Type/Json/StringTools e as da engine
+  (Paths, Options, Lang, Conductor, Controls, Note, Strum, Character, ...). `import flixel.text.FlxText;` e `import a.b.C as D;` tambem funcionam.
+- Helpers: `rgb`, `rgba`, `point`, `add/remove/insert/addHUD`, `createSprite`, `createAnimated`, `createText`, `playSound`, `playMusic`, `timer(seg, fn, vezes)`, `tween(obj, props, dur, opts)`,
+  `image`, `sparrow`, `getText`, `getJson`, `exists`, `translate`, `option`, `switchState("menu"|"freeplay"|"options"|"mods"|"play"|"editor")`,
+  `importScript("caminho")` (junta outro .hx no mesmo escopo), `disableScript()`, `cancelEvent()`, `shared["chave"]` (mapa comum a todos os scripts), `trace(...)`.
+- Eventos do PlayState: `onCreate`, `onCreatePost`, `onUpdate`, `onUpdatePost`, `onSongStart`, `onSongEnd`, `onStepHit`, `onBeatHit`, `onCountdown(i)`, `onNoteSpawn(note)`,
+  `onNoteHitPre(note, rating)`, `onNoteHit`, `onOpponentHit`, `onMissPre(note)`, `onMiss`, `onGhostTap(lane)`, `onSplash(splash, note)`, `onPopup(rating)`, `onCameraMove(mustHit)`,
+  `onPause`, `onResume`, `onGameOver`, `onDestroy`. Os que tem "Pre", `onSongEnd`, `onCountdown`, `onSplash`, `onPopup` e `onCameraMove` aceitam `cancelEvent()` pra pular o comportamento padrao.
+- Carrega tambem `scripts/global/*.hx` e `songs/<id>/scripts/*.hx` (todos os .hx da pasta). Erros de script vao pro log e pra `Script.errors` sem derrubar o jogo.
+
+### Customizar menus por script (`data/states/menu.hx`)
+Dentro do mod: `data/states/menu.hx` (menu principal). Tambem vale `data/states/global.hx` (todo menu com scripts), `data/states/options.hx` e `data/states/menu/*.hx`.
+Eventos do menu: `onCreate` (antes de montar: mexa em `menuItems`, `itemStartY`, `itemSpacing`), `onCreatePost` (depois: `bg`, `items`, `magenta`, `versionTxt`...),
+`onUpdate`, `onChange(i, id)`, `onSelect(i, id)` (`cancelEvent()` = voce cuida da acao), `onDestroy`.
+Cada item de `menuItems` e `{id, file, idle, selected, action}` (`action` = nome de state ou funcao). Exemplo completo: `example_mods/ScriptExample/`.
+Outras telas podem ganhar o mesmo recurso com `new StateScript(this, "nome")` (veja `OptionsState.hx` e `MainMenuState.hx`).
+
 ### Editor de chart
 Toque em **[ EDITOR DE CHART ]** no canto superior esquerdo do menu principal (ou tecla E no PC). Escolha uma musica ou "+ nova musica".
 Visual minimalista com fonte normal (`assets/fonts/ui.ttf`, so o editor usa; o resto do jogo continua com a vcr).

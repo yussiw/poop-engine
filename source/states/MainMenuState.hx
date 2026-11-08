@@ -20,17 +20,30 @@ import flixel.util.FlxColor;
  * Navegacao: swipe cima/baixo, toque no item selecionado confirma.
  */
 class MainMenuState extends FlxState {
-	static var cur:Int = 0;
+	static var lastCur:Int = 0;
 
-	var files = ["menu_story_mode", "freeplay", "options", "menu_credits"];
-	var idles = ["story_mode idle", "freeplay basic", "options basic", "credits idle"];
-	var sels = ["story_mode selected", "freeplay white", "options white", "credits selected"];
-	var items:FlxTypedGroup<FlxSprite>;
-	var bg:FlxSprite;
-	var magenta:FlxSprite;
-	var camFollow:FlxObject;
-	var versionTxt:FlxText;
-	var selected:Bool = false;
+	/**
+	 * Itens do menu. Scripts (data/states/menu.hx) podem mudar a lista em onCreate:
+	 *   menuItems.push({id: "meu", file: "menu_meu", idle: "meu idle", selected: "meu selected", action: "options"});
+	 * file = atlas em images/menus/mainmenu/<file>.xml; action = nome de state ("freeplay", "options", "mods", "editor",
+	 * "credits", "menu"...) ou uma funcao do script. Sem action, usa o id.
+	 */
+	public var menuItems:Array<MenuItemDef> = [
+		{id: "story", file: "menu_story_mode", idle: "story_mode idle", selected: "story_mode selected", action: "credits"},
+		{id: "freeplay", file: "freeplay", idle: "freeplay basic", selected: "freeplay white", action: "freeplay"},
+		{id: "options", file: "options", idle: "options basic", selected: "options white", action: "options"},
+		{id: "credits", file: "menu_credits", idle: "credits idle", selected: "credits selected", action: "credits"}
+	];
+	public var itemStartY:Float = 60;
+	public var itemSpacing:Float = 160;
+	public var cur:Int = 0;
+	public var items:FlxTypedGroup<FlxSprite>;
+	public var bg:FlxSprite;
+	public var magenta:FlxSprite;
+	public var camFollow:FlxObject;
+	public var versionTxt:FlxText;
+	public var selected:Bool = false;
+	var scripts:StateScript;
 	var retryTimer:Float = 0;
 	var logBG:FlxSprite;
 	var logTxt:FlxText;
@@ -42,6 +55,9 @@ class MainMenuState extends FlxState {
 
 	override function create():Void {
 		super.create();
+		cur = lastCur;
+		scripts = new StateScript(this, "menu");
+		scripts.call("onCreate");
 		if (FlxG.sound.music == null || !FlxG.sound.music.playing)
 			FlxG.sound.playMusic(Paths.music("freakyMenu"), 0.7);
 
@@ -61,21 +77,21 @@ class MainMenuState extends FlxState {
 			b.scale.set(1.15, 1.15);
 			b.updateHitbox();
 			b.screenCenter();
-			b.antialiasing = true;
+			b.antialiasing = Options.antialiasing;
 		}
 
 		items = new FlxTypedGroup<FlxSprite>();
 		add(items);
-		for (i in 0...files.length) {
-			var s = new FlxSprite(0, 60 + i * 160);
-			s.frames = Paths.sparrow("menus/mainmenu/" + files[i]);
-			s.animation.addByPrefix("idle", idles[i], 24, true);
-			s.animation.addByPrefix("selected", sels[i], 24, true);
+		for (i in 0...menuItems.length) {
+			var s = new FlxSprite(0, itemStartY + i * itemSpacing);
+			s.frames = Paths.sparrow("menus/mainmenu/" + menuItems[i].file);
+			s.animation.addByPrefix("idle", menuItems[i].idle, 24, true);
+			s.animation.addByPrefix("selected", menuItems[i].selected, 24, true);
 			s.animation.play("idle");
 			s.ID = i;
 			s.screenCenter(X);
 			s.scrollFactor.set(0, ITEM_SCROLL);
-			s.antialiasing = true;
+			s.antialiasing = Options.antialiasing;
 			items.add(s);
 		}
 
@@ -87,7 +103,7 @@ class MainMenuState extends FlxState {
 		versionTxt.y = FlxG.height - versionTxt.height - 4;
 		add(versionTxt);
 
-		var edTxt = new FlxText(10, 6, 0, "[ EDITOR ]", 18);
+		var edTxt = new FlxText(10, 6, 0, Lang.get("menu.editor"), 18);
 		edTxt.scrollFactor.set();
 		edTxt.setFormat(Paths.font("vcr.ttf"), 18, 0xFF99FFBB, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(edTxt);
@@ -107,6 +123,7 @@ class MainMenuState extends FlxState {
 			logTxt.alpha = logBG.alpha = 0;
 
 		changeItem(0);
+		scripts.call("onCreatePost");
 	}
 
 	/** Monta o texto do log. Nao reinicia o fade (so showLog faz isso). */
@@ -138,6 +155,8 @@ class MainMenuState extends FlxState {
 		if (h != 0)
 			FlxG.sound.play(Paths.sfx("menu/scroll"), 0.4);
 		cur = (cur + h + items.length) % items.length;
+		lastCur = cur;
+		scripts.call("onChange", [cur, menuItems[cur].id]);
 		items.forEach(function(spr:FlxSprite) {
 			spr.animation.play("idle");
 			if (spr.ID == cur) {
@@ -154,6 +173,14 @@ class MainMenuState extends FlxState {
 	function accept():Void {
 		if (selected)
 			return;
+		// onSelect(indice, id) + cancelEvent() = o script cuida da acao (nenhuma animacao padrao)
+		if (scripts.call("onSelect", [cur, menuItems[cur].id]))
+			return;
+		var act:Dynamic = menuItems[cur].action;
+		if (act != null && Reflect.isFunction(act)) {
+			act(); // acao em funcao (do script): ela decide o que acontece
+			return;
+		}
 		selected = true;
 		FlxG.sound.play(Paths.sfx("menu/confirm"));
 		if (Options.flashing) {
@@ -168,19 +195,14 @@ class MainMenuState extends FlxState {
 	}
 
 	function go():Void {
-		switch (cur) {
-			case 1:
-				TransitionSubState.go(new FreeplayState());
-			case 2:
-				TransitionSubState.go(new OptionsState());
-			default:
-				TransitionSubState.go(new ComingSoonState());
-		}
+		var it = menuItems[cur];
+		Script.switchState(it.action != null ? it.action : it.id);
 	}
 
 	override function update(elapsed:Float):Void {
 		Controls.update();
 		super.update(elapsed);
+		scripts.call("onUpdate", [elapsed]);
 		// o frame "selected" e mais largo: mantem sempre centralizado em X
 		items.forEach(function(s:FlxSprite) s.screenCenter(X));
 		if (selected)
@@ -241,4 +263,17 @@ class MainMenuState extends FlxState {
 			}
 		}
 	}
+
+	override function destroy():Void {
+		scripts.call("onDestroy");
+		super.destroy();
+	}
+}
+
+typedef MenuItemDef = {
+	var id:String;
+	var file:String;
+	var idle:String;
+	var selected:String;
+	@:optional var action:Dynamic;
 }

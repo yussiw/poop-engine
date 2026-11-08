@@ -8,3 +8,10 @@ function onNoteHit(note, rating) {
 	if (rating == "sick" && game.combo % 50 == 0 && game.combo > 0)
 		game.bf.playAnim("hey");
 }
+
+// ---- Eventos extras (descomente pra testar) ----
+// function onSplash(splash, note) { splash.color = rgb(255, 255, 0); }   // splash da nota SICK
+// function onNoteHitPre(note, rating) { if (rating == "shit") cancelEvent(); } // cancela o acerto
+// function onCameraMove(mustHit) { /* cancelEvent() pra controlar a camera sozinho */ }
+// Campos do PlayState valem direto: score, health, combo, bf, dad, downscroll, splashes...
+// shared["x"] = 1 e shared["x"] sao compartilhados entre scripts; importScript("scripts/outro") junta outro .hx neste.

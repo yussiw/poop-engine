@@ -405,7 +405,7 @@ class ChartEditorState extends FlxState {
 		if (camTextN >= camTexts.length) {
 			t = new FlxText(0, 0, CAMW, "", 11);
 			t.setFormat(Paths.font("ui.ttf"), 11, C_TEXT, FlxTextAlign.CENTER);
-			t.antialiasing = true;
+			t.antialiasing = Options.antialiasing;
 			camTxtGrp.add(t);
 			camTexts.push(t);
 		} else
@@ -427,7 +427,7 @@ class ChartEditorState extends FlxState {
 				s.animation.play("n");
 			} else
 				s.makeGraphic(20, 20, LANE_COLORS[lane % 4]);
-			s.antialiasing = true;
+			s.antialiasing = Options.antialiasing;
 			headGrp.add(s);
 			arr.push(s);
 		}
@@ -580,7 +580,7 @@ class ChartEditorState extends FlxState {
 		s.color = C_BTN;
 		var t = new FlxText(x, y, w, text, size);
 		t.setFormat(Paths.font("ui.ttf"), size, C_TEXT, FlxTextAlign.CENTER);
-		t.antialiasing = true;
+		t.antialiasing = Options.antialiasing;
 		t.y = y + (h - t.height) / 2;
 		add(s);
 		add(t);
@@ -622,7 +622,7 @@ class ChartEditorState extends FlxState {
 	function label(x:Float, y:Float, w:Float, size:Int, color:Int, align:FlxTextAlign, tab:Int = -1):FlxText {
 		var t = new FlxText(x, y, w, "", size);
 		t.setFormat(Paths.font("ui.ttf"), size, color, align);
-		t.antialiasing = true;
+		t.antialiasing = Options.antialiasing;
 		add(t);
 		if (tab >= 0)
 			tabTexts.push({t: t, tab: tab});

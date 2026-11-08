@@ -78,7 +78,7 @@ class TouchCursor extends FlxGroup {
 		for (s in all) {
 			s.scrollFactor.set();
 			s.cameras = [cam];
-			s.antialiasing = true;
+			s.antialiasing = Options.antialiasing;
 			s.visible = false;
 			add(s);
 		}

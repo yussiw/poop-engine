@@ -29,7 +29,7 @@ class FreeplayState extends FlxState {
 
 		songs = Paths.json("data/songlist.json");
 		var bg = new FlxSprite(0, 0, Paths.image("menus/menuBGBlue"));
-		bg.antialiasing = true;
+		bg.antialiasing = Options.antialiasing;
 		add(bg);
 
 		grpSongs = new FlxTypedGroup<Alphabet>();
@@ -89,7 +89,7 @@ class FreeplayState extends FlxState {
 		lerpScore = FlxMath.lerp(intendedScore, lerpScore, Math.exp(-elapsed * 24));
 		if (Math.abs(lerpScore - intendedScore) <= 10)
 			lerpScore = intendedScore;
-		scoreText.text = "PERSONAL BEST:" + Math.round(lerpScore);
+		scoreText.text = Lang.get("freeplay.best") + Math.round(lerpScore);
 		scoreText.x = FlxG.width - scoreText.width - 6;
 		scoreBG.scale.x = FlxG.width - scoreText.x + 6;
 		scoreBG.x = FlxG.width - scoreBG.scale.x / 2;

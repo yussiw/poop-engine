@@ -19,7 +19,7 @@
 		- minimum-sdk-version 21 = Android 5.0 (minimo do Lime 8).
 		- architecture: Lime 8.1.2 so gera arm64 por padrao; armv7 (32 bits) mantem aparelhos antigos funcionando.
 	-->
-	<config:android target-sdk-version="35" if="android" />
+	<config:android target-sdk-version="34" if="android" />
 	<config:android minimum-sdk-version="21" if="android" />
 	<architecture name="arm64" if="android" />
 	<architecture name="armv7" if="android" />
