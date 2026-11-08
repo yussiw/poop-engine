@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+	<app title="Poop Engine" file="PoopEngine" packageName="com.poopengine.game" package="com.poopengine.game" main="Main" version="0.1.0" company="You" />
+	<app preloader="flixel.system.FlxPreloader" />
+	<icon path="icon.png" />
+	<set name="SWF_VERSION" value="11.8" />
+
+	<window width="1280" height="720" fps="60" background="#000000" hardware="true" vsync="false" />
+	<window if="mobile" orientation="landscape" fullscreen="true" resizable="false" />
+	<window if="desktop" fullscreen="false" resizable="true" />
+
+	<set name="BUILD_DIR" value="export/debug" if="debug" />
+	<set name="BUILD_DIR" value="export/release" unless="debug" />
+
+	<!--
+		Android: compatibilidade com aparelhos antigos e novos.
+		- target-sdk-version: o Play Protect mostra "app criado para uma versao antiga do Android" quando o target esta mais de
+		  2 niveis abaixo do Android do aparelho. 35 cobre ate o Android 17. Se o Gradle reclamar do SDK 35 no CI, use 34.
+		- minimum-sdk-version 21 = Android 5.0 (minimo do Lime 8).
+		- architecture: Lime 8.1.2 so gera arm64 por padrao; armv7 (32 bits) mantem aparelhos antigos funcionando.
+	-->
+	<config:android target-sdk-version="35" if="android" />
+	<config:android minimum-sdk-version="21" if="android" />
+	<architecture name="arm64" if="android" />
+	<architecture name="armv7" if="android" />
+
+	<!-- pasta de mods externa: /storage/emulated/0/.PoopEngine/mods (precisa de acesso a todos os arquivos) -->
+	<config:android permission="android.permission.READ_EXTERNAL_STORAGE" if="android" />
+	<config:android permission="android.permission.WRITE_EXTERNAL_STORAGE" if="android" />
+	<config:android permission="android.permission.MANAGE_EXTERNAL_STORAGE" if="android" />
+	<!-- Android 13+ (o Paths.hx pede estas no SDK >= 33; precisam estar declaradas no manifesto) -->
+	<config:android permission="android.permission.READ_MEDIA_IMAGES" if="android" />
+	<config:android permission="android.permission.READ_MEDIA_VIDEO" if="android" />
+	<config:android permission="android.permission.READ_MEDIA_AUDIO" if="android" />
+
+	<classpath name="source" />
+	<assets path="assets" rename="assets" />
+
+	<haxelib name="flixel" />
+	<haxelib name="hscript" />
+	<haxelib name="extension-androidtools" if="android" />
+
+	<!-- necessario para os scripts .hx enxergarem campos/metodos via reflexao -->
+	<haxeflag name="-dce" value="no" />
+	<haxedef name="FLX_NO_DEBUG" unless="debug" />
+	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
+</project>
