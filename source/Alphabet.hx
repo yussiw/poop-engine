@@ -2,6 +2,8 @@ package;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
+import flixel.graphics.frames.FlxAtlasFrames;
+import flixel.graphics.frames.FlxFrame;
 import flixel.group.FlxSpriteGroup;
 import flixel.math.FlxMath;
 
@@ -15,6 +17,10 @@ class Alphabet extends FlxSpriteGroup {
 		":" => "colon", "&" => "ampersand", "+" => "plus", "/" => "slash", "_" => "underscore"
 	];
 	static final NUMS:Array<String> = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+
+	/** frames das letras ja procurados (muda so quando o atlas muda, ex.: troca de mod) */
+	static var atlas:FlxAtlasFrames = null;
+	static var glyphs:Map<String, FlxFrame> = new Map();
 
 	/** A fonte bold nao tem acentos: troca por letra sem acento (vira "opcoes" etc.). */
 	public static function plain(t:String):String {
@@ -32,6 +38,13 @@ class Alphabet extends FlxSpriteGroup {
 	public function new(x:Float, y:Float, text:String) {
 		super(x, y);
 		text = plain(text);
+		var f = Paths.sparrow("menus/alphabet-bold");
+		if (f == null)
+			return;
+		if (f != atlas) {
+			atlas = f;
+			glyphs = new Map();
+		}
 		var xPos:Float = 0;
 		for (i in 0...text.length) {
 			var c = text.charAt(i).toLowerCase();
@@ -49,10 +62,18 @@ class Alphabet extends FlxSpriteGroup {
 				name = SYMBOLS.get(c);
 			if (name == null)
 				continue;
+			// usa o frame da letra direto (mesmo quadro de antes), sem criar um controlador de animacao por letra
+			var fr = glyphs.get(name);
+			if (fr == null) {
+				fr = f.getByName("character-" + name + "0000");
+				if (fr != null)
+					glyphs.set(name, fr);
+			}
+			if (fr == null)
+				continue;
 			var l = new FlxSprite(xPos, 0);
-			l.frames = Paths.sparrow("menus/alphabet-bold");
-			l.animation.addByIndices("a", "character-" + name, [0], "", 24, false);
-			l.animation.play("a");
+			l.frames = f;
+			l.frame = fr;
 			l.updateHitbox();
 			l.antialiasing = Options.antialiasing;
 			add(l);

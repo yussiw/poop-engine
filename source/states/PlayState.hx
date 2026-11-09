@@ -45,12 +45,20 @@ class PlayState extends FlxState {
 	var hits:Float = 0;
 	var total:Int = 0;
 	var unspawn:Array<NoteData> = [];
+	/** proxima nota a aparecer (indice em vez de unspawn.shift(), que move o array todo a cada nota) */
+	var unspawnIdx:Int = 0;
+	/** lista reaproveitada todo quadro em updateNotes (evita criar um array novo 60x por segundo) */
+	var killList:Array<Note> = [];
 	var hitbox:Array<FlxSprite> = [];
 	var camTop:FlxCamera;
-	var healthBar:FlxBar;
-	var iconP1:FlxSprite;
-	var iconP2:FlxSprite;
-	var scoreTxt:FlxText;
+	// HUD (publico: scripts podem mover, esconder ou trocar. Veja data/hud.hx no README)
+	public var healthBar:FlxBar;
+	public var healthBarBG:FlxSprite;
+	public var iconP1:FlxSprite;
+	public var iconP2:FlxSprite;
+	public var scoreTxt:FlxText;
+	public var watermark:FlxText;
+	public var accuracy:Float = 0;
 	var camFollow:FlxObject;
 	var defaultZoom:Float = 0.9;
 	var started:Bool = false;
@@ -180,7 +188,7 @@ class PlayState extends FlxState {
 		add(splashes);
 		loadNotes();
 
-		var hbBG = new FlxSprite(0, downscroll ? FlxG.height * 0.1 : FlxG.height * 0.9, Paths.image("game/healthBar"));
+		var hbBG = healthBarBG = new FlxSprite(0, downscroll ? FlxG.height * 0.1 : FlxG.height * 0.9, Paths.image("game/healthBar"));
 		hbBG.screenCenter(X);
 		hbBG.cameras = [camHUD];
 		add(hbBG);
@@ -202,7 +210,7 @@ class PlayState extends FlxState {
 		add(scoreTxt);
 		updateScore();
 
-		var wm = new FlxText(4, hbBG.y + 50, 0, songName + " - NORMAL | Poop Engine", 16);
+		var wm = watermark = new FlxText(4, hbBG.y + 50, 0, songName + " - NORMAL | Poop Engine", 16);
 		wm.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		wm.borderSize = 1.25;
 		wm.cameras = [camHUD];
@@ -216,6 +224,7 @@ class PlayState extends FlxState {
 		var stageName:String = chart.stage != null ? chart.stage : "default";
 		var paths:Array<String> = ["scripts/global.hx"];
 		paths = paths.concat(Paths.list("scripts/global", "hx"));
+		paths.push("data/hud.hx"); // HUD custom (mod: <mod>/data/hud.hx)
 		paths = paths.concat(['stages/$stageName.hx', 'songs/$songId/script.hx', 'songs/$songId/modchart.hx']);
 		paths = paths.concat(Paths.list('songs/$songId/scripts', "hx"));
 		for (p in paths) {
@@ -318,8 +327,8 @@ class PlayState extends FlxState {
 		}
 
 		// spawn
-		while (unspawn.length > 0 && unspawn[0].t - Conductor.songPosition < 1800 / speed) {
-			var d = unspawn.shift();
+		while (unspawnIdx < unspawn.length && unspawn[unspawnIdx].t - Conductor.songPosition < 1800 / speed) {
+			var d = unspawn[unspawnIdx++];
 			var n = new Note(d.t, d.d, d.sus, d.p);
 			notes.add(n);
 			if (n.sustain != null)
@@ -527,7 +536,8 @@ class PlayState extends FlxState {
 	}
 
 	function updateNotes(elapsed:Float):Void {
-		var kill:Array<Note> = [];
+		var kill = killList;
+		kill.resize(0);
 		for (n in notes.members) {
 			if (n == null || !n.alive)
 				continue;
@@ -689,6 +699,9 @@ class PlayState extends FlxState {
 
 	function updateScore():Void {
 		var acc = total > 0 ? hits / total * 100 : 0;
+		accuracy = acc;
+		if (callScript("onUpdateScore", [score, misses, acc]))
+			return; // o script atualiza o proprio texto
 		scoreTxt.text = Lang.get("game.score") + ':$score | ' + Lang.get("game.breaks") + ':$misses | ' + Lang.get("game.accuracy") + ':' + FlxMath.roundDecimal(acc, 2) + '%';
 	}
 
@@ -697,10 +710,12 @@ class PlayState extends FlxState {
 		for (i in 0...hitbox.length)
 			hitbox[i].alpha = Controls.pressed[i] ? 0.22 : Math.max(0, hitbox[i].alpha - elapsed * 2);
 
-		var cx = healthBar.x + healthBar.width * (1 - health / 2);
-		var iy = healthBar.y - 75;
-		iconP1.setPosition(cx - 26, iy);
-		iconP2.setPosition(cx - iconP2.frameWidth + 26, iy);
+		if (!callScript("onUpdateIcons", [elapsed])) {
+			var cx = healthBar.x + healthBar.width * (1 - health / 2);
+			var iy = healthBar.y - 75;
+			iconP1.setPosition(cx - 26, iy);
+			iconP2.setPosition(cx - iconP2.frameWidth + 26, iy);
+		}
 		iconP1.animation.play(health < 0.4 ? "l" : "n");
 		iconP2.animation.play(health > 1.6 ? "l" : "n");
 		var k = Math.exp(-elapsed * 9);

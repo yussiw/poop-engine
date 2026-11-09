@@ -29,6 +29,12 @@ class Paths {
 	static var rootPath:String = null;
 	static var activeMod:String = "";
 	static var frameCache:Map<String, FlxAtlasFrames> = new Map();
+	/** frames (indices) de cada animacao por prefixo ja calculada: evita varrer o atlas inteiro a cada nota criada */
+	static var animCache:Map<String, Array<Int>> = new Map();
+	/** lista de arquivos embutidos (Assets.list() cria um array novo a cada chamada) */
+	static var assetList:Array<String> = null;
+	/** ids das imagens que carregamos (persist = true), pra poder solta-las ao trocar de mod */
+	static var loadedImages:Map<String, Bool> = new Map();
 
 	public static var externalReady:Bool = false;
 	static var asked:Bool = false;
@@ -220,6 +226,19 @@ class Paths {
 
 	public static function clearCache():Void {
 		frameCache.clear();
+		animCache.clear();
+		Shaders.clear();
+		// as imagens sao persistentes (persist = true), entao clearCache() nao as solta: sem isto, tudo que ja foi
+		// aberto antes de trocar de mod (menu, icones...) continuava com a imagem antiga; so telas novas pegavam a do mod.
+		for (k in loadedImages.keys()) {
+			var g = FlxG.bitmap.get(k);
+			if (g != null) {
+				g.persist = false;
+				g.destroyOnNoUse = true;
+			}
+			FlxG.bitmap.removeByKey(k);
+		}
+		loadedImages.clear();
 		FlxG.bitmap.clearCache();
 		if (Lang.loaded)
 			Lang.load(Lang.current); // o mod pode trazer/trocar traducoes
@@ -256,7 +275,9 @@ class Paths {
 		}
 		#end
 		var base = "assets/" + prefix;
-		for (a in Assets.list()) {
+		if (assetList == null)
+			assetList = Assets.list();
+		for (a in assetList) {
 			if (StringTools.startsWith(a, base) && StringTools.endsWith(a, suffix) && a.indexOf("/", base.length) < 0) {
 				var k = a.substr(7);
 				if (out.indexOf(k) < 0)
@@ -316,6 +337,7 @@ class Paths {
 		g = FlxG.bitmap.add(bmd, false, id);
 		g.persist = true;
 		g.destroyOnNoUse = false;
+		loadedImages.set(id, true);
 		return g;
 	}
 
@@ -331,6 +353,25 @@ class Paths {
 		var f = FlxAtlasFrames.fromSparrow(g, xml);
 		frameCache.set(key, f);
 		return f;
+	}
+
+	/**
+	 * Igual a spr.animation.addByPrefix(), mas guarda o resultado: a primeira vez varre o atlas, as proximas so copiam
+	 * a lista de frames (mesmos frames, mesma ordem, nenhuma mudanca visual). Retorna false se o prefixo nao existe.
+	 */
+	public static function addAnim(spr:flixel.FlxSprite, name:String, prefix:String, fps:Float = 24, loop:Bool = true):Bool {
+		var key = (spr.frames != null && spr.frames.parent != null ? spr.frames.parent.key : "") + "|" + prefix;
+		var idx = animCache.get(key);
+		if (idx != null) {
+			if (idx.length == 0)
+				return false; // prefixo ja procurado e nao existe nesse atlas
+			spr.animation.add(name, idx, fps, loop);
+			return true;
+		}
+		spr.animation.addByPrefix(name, prefix, fps, loop);
+		var a = spr.animation.getByName(name);
+		animCache.set(key, a == null ? [] : a.frames.copy());
+		return a != null;
 	}
 
 	public static function audio(id:String):Sound {

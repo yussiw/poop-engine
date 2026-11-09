@@ -16,6 +16,7 @@ class Main extends Sprite {
 		instance = this;
 		addChild(new FlxGame(1280, 720, MainMenuState, 60, 60, true, false));
 		TransitionSubState.init();
+		Shaders.init();
 		FlxG.autoPause = false;
 		FlxG.save.bind("poopengine");
 		Paths.init();

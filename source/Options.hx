@@ -3,15 +3,19 @@ package;
 import flixel.FlxG;
 
 /**
- * Definicao de uma opcao. type: "bool" | "int" | "choice".
+ * Definicao de uma opcao. type: "bool" | "int" | "choice" | "info" | "action".
  *   name/desc = chave de traducao (Lang) ou texto literal.
  *   choices (type choice) = ids; o texto mostrado vem da chave "<id>.<choice>" se existir.
+ *   info   = linha so de leitura: `value` e uma funcao que devolve o texto mostrado depois do nome.
+ *   action = item que executa `action()` ao ser tocado (sem valor salvo).
  */
 typedef OptionDef = {
 	var id:String;
 	var category:String;
 	var type:String;
-	var def:Dynamic;
+	@:optional var def:Dynamic;
+	@:optional var value:Dynamic;
+	@:optional var action:Dynamic;
 	@:optional var min:Float;
 	@:optional var max:Float;
 	@:optional var step:Float;
@@ -30,7 +34,10 @@ typedef OptionDef = {
  */
 class Options {
 	/** ordem das categorias no menu de opcoes. Categorias novas (de mods) entram no fim. */
-	public static var categories:Array<String> = ["gameplay", "graphics", "interface", "controls", "language"];
+	public static var categories:Array<String> = ["gameplay", "graphics", "interface", "controls", "language", "updates"];
+
+	/** categorias que mostram um painel de texto (funcao que devolve o texto) em vez de so a lista. Ex.: "updates". */
+	public static var infoPanels:Map<String, Void->String> = new Map();
 
 	public static var defs:Array<OptionDef> = [];
 	static var values:Map<String, Dynamic> = new Map();
@@ -45,6 +52,7 @@ class Options {
 	public static var splashes:Bool = true;
 	public static var camZooming:Bool = true;
 	public static var antialiasing:Bool = true;
+	public static var shaders:Bool = true;
 	public static var lowQuality:Bool = false;
 	public static var fpsCounter:Bool = false;
 	public static var fps:Int = 60;
@@ -61,6 +69,7 @@ class Options {
 		// graficos
 		register({id: "antialiasing", category: "graphics", type: "bool", def: true});
 		register({id: "lowQuality", category: "graphics", type: "bool", def: false});
+		register({id: "shaders", category: "graphics", type: "bool", def: true});
 		register({id: "fps", category: "graphics", type: "choice", def: "60", choices: ["30", "60", "90", "120", "144"]});
 		register({id: "fpsCounter", category: "graphics", type: "bool", def: false});
 		register({id: "flashing", category: "graphics", type: "bool", def: true});
@@ -72,6 +81,49 @@ class Options {
 		register({id: "touchCursor", category: "controls", type: "bool", def: false});
 		// idioma
 		register({id: "language", category: "language", type: "choice", def: "pt-BR", choices: Lang.available});
+		// atualizacoes (info do commit + checagem no GitHub; ver Updates.hx)
+		register({id: "updCheck", category: "updates", type: "action", action: function() Updates.check()});
+		register({id: "updGithub", category: "updates", type: "action", action: function() Updates.openRepo()});
+		infoPanels.set("updates", Updates.panelText);
+	}
+
+	/**
+	 * Garante que o valor tem o tipo certo pra opcao. Saves antigos (ou de outra versao da engine) podiam ter, por exemplo,
+	 * `true` em "fps"/"volume" e `false` em "language", e a tela mostrava "FRAME RATE: TRUE". Valor invalido volta pro padrao.
+	 */
+	static function coerce(d:OptionDef, v:Dynamic):Dynamic {
+		switch (d.type) {
+			case "bool":
+				if (Std.isOfType(v, Bool))
+					return v;
+				if (Std.isOfType(v, String)) {
+					var t = Std.string(v).toLowerCase();
+					if (t == "true")
+						return true;
+					if (t == "false")
+						return false;
+				}
+				return d.def == true;
+			case "int":
+				if (v == null || Std.isOfType(v, Bool))
+					return d.def;
+				var n = Std.parseFloat(Std.string(v));
+				if (Math.isNaN(n))
+					return d.def;
+				var lo:Float = d.min == null ? -1e9 : d.min;
+				var hi:Float = d.max == null ? 1e9 : d.max;
+				return Std.int(Math.max(lo, Math.min(hi, n)));
+			case "choice":
+				if (v == null || !Std.isOfType(v, String))
+					return d.def;
+				var t = Std.string(v);
+				if (d.choices != null && d.choices.indexOf(t) >= 0)
+					return t;
+				// idiomas vindos de mods so entram em Lang.available depois (ver sync()), entao aceita qualquer texto
+				return (d.id == "language" && t != "") ? t : d.def;
+			default:
+				return v;
+		}
 	}
 
 	/** Registra (ou substitui) uma opcao. Chamavel de scripts: Options.register({id: "x", category: "mod", type: "bool", def: true}). */
@@ -79,13 +131,14 @@ class Options {
 		for (i in 0...defs.length)
 			if (defs[i].id == d.id) {
 				defs[i] = d;
+				if (values.exists(d.id))
+					values.set(d.id, coerce(d, values.get(d.id)));
 				return;
 			}
 		defs.push(d);
 		if (categories.indexOf(d.category) < 0)
 			categories.push(d.category);
-		if (!values.exists(d.id))
-			values.set(d.id, d.def);
+		values.set(d.id, values.exists(d.id) ? coerce(d, values.get(d.id)) : d.def);
 	}
 
 	public static function find(id:String):OptionDef {
@@ -108,8 +161,8 @@ class Options {
 
 	public static function set(id:String, v:Dynamic):Void {
 		var d = find(id);
-		if (d != null && d.type == "int")
-			v = Std.int(Math.max(d.min, Math.min(d.max, Std.parseFloat(Std.string(v)))));
+		if (d != null)
+			v = coerce(d, v);
 		values.set(id, v);
 		var o:Dynamic = FlxG.save.data.opts;
 		if (o == null) {
@@ -124,6 +177,9 @@ class Options {
 	/** Avanca a opcao pro proximo valor (bool alterna, int cicla min..max, choice cicla a lista). */
 	public static function cycle(d:OptionDef, dir:Int = 1):Void {
 		switch (d.type) {
+			case "info", "action":
+				// sem valor pra ciclar (action: use Options.trigger)
+				return;
 			case "bool":
 				set(d.id, !(get(d.id) == true));
 			case "int":
@@ -144,10 +200,17 @@ class Options {
 	public static function valueText(d:OptionDef):String {
 		var v = get(d.id);
 		return switch (d.type) {
+			case "info", "action": d.value != null && Reflect.isFunction(d.value) ? Std.string(Reflect.callMethod(null, d.value, [])) : "";
 			case "bool": Lang.get(v == true ? "common.on" : "common.off");
 			case "int": Std.string(v) + (d.suffix == null ? "" : d.suffix);
 			default: Lang.get(d.id + "." + Std.string(v), Std.string(v));
 		}
+	}
+
+	/** Executa a funcao de uma opcao do tipo "action". */
+	public static function trigger(d:OptionDef):Void {
+		if (d.action != null && Reflect.isFunction(d.action))
+			Reflect.callMethod(null, d.action, []);
 	}
 
 	public static function load():Void {
@@ -162,12 +225,15 @@ class Options {
 			if (Reflect.field(d, k) != null) {
 				var v:Dynamic = Reflect.field(d, k);
 				var def = find(id);
-				values.set(id, def != null && def.type == "bool" ? v == true : v);
+				values.set(id, def != null ? coerce(def, v) : v);
 			}
 		var o:Dynamic = d.opts;
 		if (o != null)
-			for (f in Reflect.fields(o))
-				values.set(f, Reflect.field(o, f));
+			for (f in Reflect.fields(o)) {
+				var raw:Dynamic = Reflect.field(o, f);
+				var def = find(f);
+				values.set(f, def == null ? raw : coerce(def, raw));
+			}
 		sync();
 		FlxG.sound.volume = volume10 / 10;
 	}
@@ -183,6 +249,7 @@ class Options {
 		splashes = get("splashes") == true;
 		camZooming = get("camZooming") == true;
 		antialiasing = get("antialiasing") == true;
+		shaders = get("shaders") == true;
 		lowQuality = get("lowQuality") == true;
 		fpsCounter = get("fpsCounter") == true;
 		Controls.showHitbox = get("hitbox") == true;

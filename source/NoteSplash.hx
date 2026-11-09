@@ -28,7 +28,7 @@ class NoteSplash extends FlxSprite {
 			return;
 		}
 		frames = f;
-		animation.addByPrefix("s", "note impact " + FlxG.random.int(1, 2) + " " + Note.COLORS[lane], 24, false);
+		Paths.addAnim(this, "s", "note impact " + FlxG.random.int(1, 2) + " " + Note.COLORS[lane], 24, false);
 		if (!animation.exists("s")) {
 			kill();
 			return;

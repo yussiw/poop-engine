@@ -12,9 +12,9 @@ class Strum extends FlxSprite {
 		this.lane = lane;
 		frames = Paths.sparrow("game/notes/default");
 		var d = Note.DIRS[lane];
-		animation.addByPrefix("static", "arrow" + d.toUpperCase() + "0", 24, false);
-		animation.addByPrefix("press", d + " press", 24, false);
-		animation.addByPrefix("confirm", d + " confirm", 24, false);
+		Paths.addAnim(this, "static", "arrow" + d.toUpperCase() + "0", 24, false);
+		Paths.addAnim(this, "press", d + " press", 24, false);
+		Paths.addAnim(this, "confirm", d + " confirm", 24, false);
 		scale.set(Note.SCALE, Note.SCALE);
 		updateHitbox();
 		antialiasing = Options.antialiasing;

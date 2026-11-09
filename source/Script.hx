@@ -34,7 +34,8 @@ import hscript.Parser;
  *   as da engine (Paths, Conductor, Options, Lang, Controls, Note, Strum, Character, ...), Math, Std, Reflect, Type, Json...
  *   Campos do dono podem ser LIDOS direto (ex.: `score`, `bf`, `health`); pra gravar use game.score = 5.
  * HELPERS: rgb, point, add/remove/insert, addHUD, createSprite, createText, playSound, timer, tween, image, sparrow,
- *   getText, getJson, exists, translate, option, switchState, importScript, disableScript, cancelEvent, setVar/getVar, trace.
+ *   getText, getJson, exists, translate, option, switchState, importScript, disableScript, cancelEvent, setVar/getVar, trace,
+ *   shader(nome), setShader(sprite, nome), setCameraShader(camera, nome)  [classe Shaders: veja Shaders.hx].
  * IMPORT: `import flixel.text.FlxText;` / `import x.y.Classe as Outro;` funcionam (classes ja incluidas no jogo).
  */
 class Script {
@@ -216,6 +217,9 @@ class Script {
 		v.set("getText", function(k:String):String return Paths.getText(k));
 		v.set("getJson", function(k:String):Dynamic return Paths.json(k));
 		v.set("exists", function(k:String):Bool return Paths.exists(k));
+		v.set("shader", function(n:String) return Shaders.load(n));
+		v.set("setShader", function(spr:Dynamic, n:String) return Shaders.apply(spr, n));
+		v.set("setCameraShader", function(cam:Dynamic, n:String) return Shaders.applyCamera(cam, n));
 		v.set("translate", function(k:String):String return Lang.get(k));
 		v.set("option", function(k:String):Dynamic return Options.get(k));
 		v.set("setVar", function(k:String, val:Dynamic) shared.set(k, val));
@@ -316,6 +320,12 @@ class Script {
 		g.set("Character", Character);
 		g.set("HealthIcon", HealthIcon);
 		g.set("Alphabet", Alphabet);
+		g.set("Checkbox", Checkbox);
+		g.set("Updates", Updates);
+		g.set("GitInfo", GitInfo);
+		g.set("Shaders", Shaders);
+		g.set("FlxRuntimeShader", flixel.addons.display.FlxRuntimeShader);
+		g.set("ShaderFilter", openfl.filters.ShaderFilter);
 		g.set("Script", Script);
 		g.set("PlayState", states.PlayState);
 		g.set("MainMenuState", states.MainMenuState);

@@ -13,10 +13,19 @@ import flixel.util.FlxColor;
  * Deslizar cima/baixo escolhe, toque no item selecionado abre/muda o valor, deslizar pra direita (ou voltar)
  * sobe um nivel. Tudo e salvo na hora (ver Options.hx). Os textos vem do Lang (idioma escolhido).
  *
+ * Opcoes "bool" mostram o nome + a caixinha (assets/images/menus/options/checkbox); "int"/"choice" mostram "nome: valor";
+ * "action" so o nome (toque executa). Categorias com painel (Options.infoPanels, ex.: "updates") mostram um texto fixo em cima.
+ *
  * Mods: data/states/options.hx pode registrar opcoes/categorias novas (Options.register) em onCreate.
  */
 class OptionsState extends FlxState {
 	var grp:FlxTypedGroup<Alphabet>;
+	var checks:FlxTypedGroup<Checkbox>;
+	var checkOf:Map<Int, Checkbox> = new Map();
+	var panelBG:FlxSprite;
+	var panel:FlxText;
+	var panelRev:Int = -1;
+	var panelFn:Void->String = null;
 	var cur:Int = 0;
 	var catCur:Int = 0;
 	var inCategory:Bool = false;
@@ -42,6 +51,16 @@ class OptionsState extends FlxState {
 
 		grp = new FlxTypedGroup<Alphabet>();
 		add(grp);
+		checks = new FlxTypedGroup<Checkbox>();
+		add(checks);
+
+		panelBG = new FlxSprite(30, 56).makeGraphic(FlxG.width - 60, 330, FlxColor.fromRGB(0, 0, 0, 140));
+		panelBG.visible = false;
+		add(panelBG);
+		panel = new FlxText(46, 66, FlxG.width - 92, "", 22);
+		panel.setFormat(Paths.font("vcr.ttf"), 22, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		panel.visible = false;
+		add(panel);
 
 		title = new FlxText(10, 8, FlxG.width - 20, "", 28);
 		title.setFormat(Paths.font("vcr.ttf"), 28, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -63,15 +82,30 @@ class OptionsState extends FlxState {
 	function catName(c:String):String
 		return Lang.get("cat." + c, c);
 
-	function optionLabel(d:OptionDef):String
-		return Lang.get("opt." + d.id, d.name != null ? Lang.get(d.name) : d.id) + ": " + Options.valueText(d);
+	function optionName(d:OptionDef):String
+		return Lang.get("opt." + d.id, d.name != null ? Lang.get(d.name) : d.id);
+
+	/** bool = so o nome (a caixinha mostra o valor); action = so o nome; o resto = "nome: valor". */
+	function optionLabel(d:OptionDef):String {
+		if (d.type == "bool" || d.type == "action")
+			return optionName(d);
+		return optionName(d) + ": " + Options.valueText(d);
+	}
 
 	function build(snap:Bool = false):Void {
 		for (a in grp.members)
 			if (a != null)
 				a.destroy();
 		grp.clear();
+		for (c in checks.members)
+			if (c != null)
+				c.destroy();
+		checks.clear();
+		checkOf = new Map();
 		entries = [];
+		panelFn = inCategory ? Options.infoPanels.get(category) : null;
+		panelBG.visible = panel.visible = panelFn != null;
+		panelRev = -1;
 		if (!inCategory) {
 			for (c in Options.categories)
 				if (Options.ofCategory(c).length > 0)
@@ -86,17 +120,45 @@ class OptionsState extends FlxState {
 		}
 		for (i in 0...entries.length) {
 			var a = new Alphabet(0, 70 * i + 30, label(i));
-			a.isMenuItem = true;
+			a.isMenuItem = panelFn == null;
 			a.targetY = i;
+			if (panelFn != null) {
+				// categoria com painel: itens fixos embaixo do texto (sem a rolagem)
+				a.x = 90;
+				a.y = 430 + i * 100;
+			}
 			grp.add(a);
+			addCheck(i, a);
 		}
 		cur = Std.int(Math.min(cur, entries.length - 1));
 		change(0);
-		if (snap)
+		if (snap && panelFn == null)
 			for (a in grp.members) {
 				a.y = a.targetY * 1.3 * 120 + FlxG.height * 0.48;
 				a.x = a.targetY * 20 + 90;
 			}
+		if (panelFn != null)
+			refreshPanel();
+	}
+
+	/** Opcao bool = caixinha ao lado do texto. */
+	function addCheck(i:Int, a:Alphabet):Void {
+		if (!inCategory)
+			return;
+		var d = Options.find(entries[i]);
+		if (d == null || d.type != "bool")
+			return;
+		var c = new Checkbox(Options.get(d.id) == true);
+		c.sprTracker = a;
+		checks.add(c);
+		checkOf.set(i, c);
+	}
+
+	function refreshPanel():Void {
+		if (panelFn == null)
+			return;
+		panelRev = Updates.revision;
+		panel.text = panelFn();
 	}
 
 	function label(i:Int):String
@@ -112,6 +174,9 @@ class OptionsState extends FlxState {
 		grp.remove(old, true);
 		old.destroy();
 		grp.insert(i, a);
+		var c = checkOf.get(i);
+		if (c != null)
+			c.sprTracker = a;
 	}
 
 	function change(c:Int):Void {
@@ -123,7 +188,7 @@ class OptionsState extends FlxState {
 		var n = 0;
 		for (a in grp.members) {
 			a.targetY = n - cur;
-			a.alpha = a.targetY == 0 ? 1 : 0.6;
+			a.alpha = n == cur ? 1 : 0.6;
 			n++;
 		}
 		if (inCategory) {
@@ -144,14 +209,30 @@ class OptionsState extends FlxState {
 			cur = 0;
 			FlxG.sound.play(Paths.sfx("menu/scroll"), 0.6);
 			build(true);
+			if (category == "updates")
+				Updates.onOpen(); // checa o GitHub sozinho (uma vez por sessao)
 			return;
 		}
 		var d = Options.find(entries[i]);
+		if (d.type == "info")
+			return;
+		FlxG.sound.play(Paths.sfx("menu/scroll"), 0.6);
+		if (d.type == "action") {
+			Options.trigger(d);
+			scripts.call("onOptionChanged", [d.id, null]);
+			if (panelFn != null)
+				refreshPanel();
+			return;
+		}
 		Options.cycle(d);
 		scripts.call("onOptionChanged", [d.id, Options.get(d.id)]);
-		FlxG.sound.play(Paths.sfx("menu/scroll"), 0.6);
 		if (d.id == "language") {
 			build(); // todos os textos mudam de idioma
+			return;
+		}
+		var c = checkOf.get(i);
+		if (c != null) {
+			c.setChecked(Options.get(d.id) == true); // bool: so a caixinha muda (o texto e o mesmo)
 			return;
 		}
 		refresh(i);
@@ -175,6 +256,8 @@ class OptionsState extends FlxState {
 		Controls.update();
 		super.update(elapsed);
 		scripts.call("onUpdate", [elapsed]);
+		if (panelFn != null && panelRev != Updates.revision)
+			refreshPanel();
 		if (leaving)
 			return;
 		if (Controls.swipeRight || Controls.back) {

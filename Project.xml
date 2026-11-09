@@ -19,7 +19,7 @@
 		- minimum-sdk-version 21 = Android 5.0 (minimo do Lime 8).
 		- architecture: Lime 8.1.2 so gera arm64 por padrao; armv7 (32 bits) mantem aparelhos antigos funcionando.
 	-->
-	<config:android target-sdk-version="35" if="android" />
+	<config:android target-sdk-version="34" if="android" />
 	<config:android minimum-sdk-version="21" if="android" />
 	<architecture name="arm64" if="android" />
 	<architecture name="armv7" if="android" />
@@ -37,6 +37,8 @@
 	<assets path="assets" rename="assets" />
 
 	<haxelib name="flixel" />
+	<!-- FlxRuntimeShader (shaders GLSL carregados de arquivo em tempo de execucao; veja Shaders.hx) -->
+	<haxelib name="flixel-addons" />
 	<haxelib name="hscript" />
 	<haxelib name="extension-androidtools" if="android" />
 
@@ -44,4 +46,7 @@
 	<haxeflag name="-dce" value="no" />
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
+	<!-- otimizacao: bandeja de volume do Flixel nao existe no celular (o volume e uma opcao do jogo) e o analisador do Haxe enxuga o codigo gerado -->
+	<haxedef name="FLX_NO_SOUND_TRAY" if="mobile" />
+	<haxedef name="analyzer-optimize" unless="debug" />
 </project>

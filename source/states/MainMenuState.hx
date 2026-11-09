@@ -97,7 +97,7 @@ class MainMenuState extends FlxState {
 
 		FlxG.camera.follow(camFollow, null, 0.06);
 
-		versionTxt = new FlxText(12, FlxG.height - 46, 0, "Friday Night Funkin' v0.2.8\nPoop Engine v0.1", 16);
+		versionTxt = new FlxText(12, FlxG.height - 46, 0, "Friday Night Funkin' v0.2.8\nPoop Engine v" + Updates.version() + (GitInfo.hasCommit ? " (" + GitInfo.short + ")" : ""), 16);
 		versionTxt.scrollFactor.set();
 		versionTxt.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		versionTxt.y = FlxG.height - versionTxt.height - 4;

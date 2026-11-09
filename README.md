@@ -47,15 +47,43 @@ Cada mod e uma **subpasta** dentro de `mods/`, com a mesma estrutura de `assets/
 - Tem um mod de teste em `example_mods/ExampleMod` (copie a pasta inteira pra `mods/`).
 
 ### Opcoes (categorias, como na Codename)
-Menu principal -> Opcoes -> escolha a categoria (**jogabilidade**, **graficos**, **interface**, **controles**, **idioma**).
+Menu principal -> Opcoes -> escolha a categoria (**jogabilidade**, **graficos**, **interface**, **controles**, **idioma**, **atualizacoes**).
 Tudo e registrado em `Options.defs` (`source/Options.hx`): `downscroll`, `ghostTapping`, `splashes`, `camZooming`, `antialiasing`, `lowQuality`, `fps` (30-144),
-`fpsCounter`, `flashing`, `menuLog`, `volume`, `hitbox`, `touchCursor`, `language`. Salvo em `FlxG.save.data.opts` (as chaves antigas sao migradas sozinhas).
+`fpsCounter`, `flashing`, `menuLog`, `volume`, `hitbox`, `touchCursor`, `language`, `shaders`. Salvo em `FlxG.save.data.opts` (as chaves antigas sao migradas sozinhas;
+valor salvo com tipo errado, ex.: `true` em `fps`, volta pro padrao em vez de aparecer como "FRAME RATE: TRUE").
+- Opcoes **bool** mostram o nome + a caixinha animada (`assets/images/menus/options/checkbox`); **int/choice** mostram `nome: valor`; **action** so o nome (toque executa `action()`).
 - Scripts e mods leem com `option("id")` / `Options.get("id")` e criam opcoes novas com `Options.register({id, category, type: "bool"|"int"|"choice", def, ...})`
   (veja `example_mods/ScriptExample/data/states/options.hx`).
 - **Idioma:** `assets/data/lang/pt-BR.json` e `en-US.json` (`Lang.get("chave")`). Chave faltando cai no en-US. Um mod pode trazer `data/lang/<id>.json`
   (e `Lang.available.push("<id>")` num script) pra adicionar um idioma. A fonte bold do Alphabet nao tem acento, entao nos itens grandes ele e tirado sozinho (opcoes -> opcoes).
 - **Downscroll:** inverte setas, notas e HUD. Os sustains ganham a **cauda** (`hold end`) na ponta, inclusive de ponta cabeca no downscroll.
 - **Splashes:** acertou **SICK** -> `images/game/splashes/default.png/.xml` ("note impact 1|2 <cor>") toca sobre o receptor. Mods trocam a imagem; `NoteSplash.skin`, `splashScale`, `splashAlpha` mudam via script.
+
+### Atualizacoes (GitHub)
+Opcoes -> **atualizacoes** mostra de qual commit esta build saiu (hash, mensagem, autor, data, branch, data da compilacao, plataforma) e checa na API do GitHub
+se a branch tem commits novos (`Updates.hx`; abre a categoria e ela checa sozinha uma vez por sessao; **verificar atualizacoes** checa de novo; **abrir github** abre o commit no navegador).
+- As infos vem de `GitInfo.hx`, preenchidas na **compilacao** por `macros/GitMacro.hx` (`git log`, `git rev-parse` e as variaveis `GITHUB_SHA`/`GITHUB_REF_NAME`/`GITHUB_REPOSITORY` do Actions).
+  Compilando sem a pasta `.git` (ex.: a partir de um zip) aparece "desconhecido". O repositorio vem do `remote.origin.url` (padrao `yussiw/poop-engine`), entao forks funcionam sozinhos.
+- O texto de versao no menu principal tambem mostra o hash curto. Scripts podem ler `GitInfo.short`, `GitInfo.commit`, `Updates.status`...
+- Uma categoria de mod pode ter painel de texto igual: `Options.infoPanels.set("minhaCategoria", function() return "texto");` (+ opcoes `type: "action"`).
+
+### Shaders
+Arquivos GLSL em `assets/shaders/<nome>.frag` (e `.vert` opcional); um mod substitui/cria em `<mod>/shaders/`. Comece o `.frag` com `#pragma header` e use
+`flixel_texture2D(bitmap, openfl_TextureCoordv)` pra ler a imagem. Se declarar `uniform float iTime;` / `uniform vec2 iResolution;` a engine atualiza sozinha.
+```haxe
+var sh = shader("grayscale");            // FlxRuntimeShader: setFloat / setFloatArray / setInt / setBool
+sh.setFloat("amount", 1.0);
+setShader(bf, "pulse");                  // num sprite (devolve o shader)
+Shaders.setCamera(FlxG.camera, [sh]);    // na tela toda de uma camera (lista de shaders); Shaders.clearCamera(cam) tira
+```
+A opcao **graficos -> shaders** desliga tudo (as funcoes de aplicar passam a nao fazer nada). Exemplos: `assets/shaders/` (`grayscale`, `vignette`, `chromatic`) e
+`example_mods/ShaderExample`. Depende da lib `flixel-addons` (`FlxRuntimeShader`). Erro de compilacao do GLSL so aparece no log na hora do primeiro desenho.
+
+### Desempenho (sem mudar a qualidade dos sprites)
+- Animacoes por prefixo (notas, setas, splashes, caixinha) sao calculadas uma vez e reaproveitadas (`Paths.addAnim`), em vez de varrer o atlas a cada nota criada.
+- `Alphabet` usa o frame da letra direto (sem um controlador de animacao por letra) e guarda os frames ja achados; `Paths.list` nao refaz `Assets.list()` a cada chamada.
+- `PlayState`: fila de notas por indice (sem `shift()`) e lista de remocao reaproveitada todo quadro (menos lixo pro GC).
+- Build: `analyzer-optimize` em release e sem a bandeja de volume do Flixel no celular.
 
 ### HScript (Script.hx) - bem mais flexivel
 - O **dono** do script (PlayState, menu...) fica em `state`/`game` e **seus campos podem ser lidos direto**: `score`, `bf`, `health`, `items`, `bg`... (pra gravar use `game.score += 100`).
@@ -68,6 +96,10 @@ Tudo e registrado em `Options.defs` (`source/Options.hx`): `downscroll`, `ghostT
   `onNoteHitPre(note, rating)`, `onNoteHit`, `onOpponentHit`, `onMissPre(note)`, `onMiss`, `onGhostTap(lane)`, `onSplash(splash, note)`, `onPopup(rating)`, `onCameraMove(mustHit)`,
   `onPause`, `onResume`, `onGameOver`, `onDestroy`. Os que tem "Pre", `onSongEnd`, `onCountdown`, `onSplash`, `onPopup` e `onCameraMove` aceitam `cancelEvent()` pra pular o comportamento padrao.
 - Carrega tambem `scripts/global/*.hx` e `songs/<id>/scripts/*.hx` (todos os .hx da pasta). Erros de script vao pro log e pra `Script.errors` sem derrubar o jogo.
+
+### HUD custom (`data/hud.hx`)
+`data/hud.hx` (no mod ou em `assets/`) e carregado junto dos scripts da musica. O HUD do PlayState e publico: `healthBar`, `healthBarBG`, `iconP1`, `iconP2`, `scoreTxt`, `watermark`, `accuracy`.
+Mova/esconda/troque em `onCreatePost`; `onUpdateScore(score, misses, acc)` e `onUpdateIcons(elapsed)` aceitam `cancelEvent()` pra voce escrever o texto / posicionar os icones. Exemplo: `example_mods/HudExample/`.
 
 ### Customizar menus por script (`data/states/menu.hx`)
 Dentro do mod: `data/states/menu.hx` (menu principal). Tambem vale `data/states/global.hx` (todo menu com scripts), `data/states/options.hx` e `data/states/menu/*.hx`.
