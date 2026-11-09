@@ -18,7 +18,7 @@ class Alphabet extends FlxSpriteGroup {
 	static var atlas:FlxAtlasFrames = null;
 	static var glyphs:Map<String, FlxFrame> = new Map();
 
-	public static function reset():Void {
+	public static function resetCache():Void {
 		atlas = null;
 		glyphs = new Map();
 	}

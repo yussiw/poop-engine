@@ -212,7 +212,7 @@ class Paths {
 		frameCache.clear();
 		animCache.clear();
 		Shaders.clear();
-		Alphabet.reset();
+		Alphabet.resetCache();
 		for (k in loadedImages.keys()) {
 			var g = FlxG.bitmap.get(k);
 			if (g != null) {
