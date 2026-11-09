@@ -1,4 +1,5 @@
 package states;
+
 import flixel.FlxCamera;
 import flixel.FlxG;
 import flixel.FlxObject;
@@ -73,8 +74,8 @@ class PlayState extends FlxState {
 		downscroll = Options.downscroll;
 		if (FlxG.sound.music != null)
 			FlxG.sound.music.stop();
-		var raw:Dynamic = Paths.json('songs/$songId/chart.json');
-		chart = (raw.song != null && !Std.isOfType(raw.song, String)) ? raw.song : raw;
+		var chartFile:Dynamic = Paths.json('songs/$songId/chart.json');
+		chart = (chartFile.song != null && !Std.isOfType(chartFile.song, String)) ? chartFile.song : chartFile;
 		songName = Std.string(chart.song);
 		speed = chart.speed != null ? chart.speed : 2;
 		pxMs = 0.45 * speed;
@@ -89,11 +90,11 @@ class PlayState extends FlxState {
 		callScript("onCreate");
 
 		var stageName:String = chart.stage != null ? chart.stage : "default";
-		var st:Dynamic = Paths.json('data/stages/$stageName.json');
-		defaultZoom = st.zoom != null ? st.zoom : 0.9;
+		var stageData:Dynamic = Paths.json('data/stages/$stageName.json');
+		defaultZoom = stageData.zoom != null ? stageData.zoom : 0.9;
 		FlxG.camera.zoom = defaultZoom;
 		var front:Array<FlxSprite> = [];
-		var objs:Array<Dynamic> = st.objects;
+		var objs:Array<Dynamic> = stageData.objects;
 		for (o in objs) {
 			if (Options.lowQuality && o.lowQuality == false)
 				continue;
@@ -113,10 +114,10 @@ class PlayState extends FlxState {
 			else
 				add(s);
 		}
-		var dp:Array<Float> = st.dad;
-		var bp:Array<Float> = st.bf;
-		dad = new Character(dp[0], dp[1], chart.player2, false);
-		bf = new Character(bp[0], bp[1], chart.player1, true);
+		var dadPos:Array<Float> = stageData.dad;
+		var bfPos:Array<Float> = stageData.bf;
+		dad = new Character(dadPos[0], dadPos[1], chart.player2, false);
+		bf = new Character(bfPos[0], bfPos[1], chart.player1, true);
 		add(dad);
 		add(bf);
 		for (s in front)
@@ -132,18 +133,18 @@ class PlayState extends FlxState {
 			instSnd = Paths.music("freakyMenu");
 		inst = FlxG.sound.load(instSnd);
 		inst.onComplete = endSong;
-		var vs = Paths.audio('songs/$songId/Voices.ogg');
-		if (vs != null)
-			voices = FlxG.sound.load(vs);
+		var voiceSnd = Paths.audio('songs/$songId/Voices.ogg');
+		if (voiceSnd != null)
+			voices = FlxG.sound.load(voiceSnd);
 		if (Controls.showHitbox) {
-			var stripW = FlxG.width / 4;
-			var lc = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
+			var laneW = FlxG.width / 4;
+			var laneColors = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
 
 			camTop = new FlxCamera();
 			camTop.bgColor = FlxColor.TRANSPARENT;
 			FlxG.cameras.add(camTop, false);
 			for (i in 0...4) {
-				var h = new FlxSprite(stripW * i, 0).makeGraphic(Std.int(stripW), FlxG.height, lc[i]);
+				var h = new FlxSprite(laneW * i, 0).makeGraphic(Std.int(laneW), FlxG.height, laneColors[i]);
 				h.alpha = 0;
 				h.scrollFactor.set(0, 0);
 				h.cameras = [camTop];
@@ -153,18 +154,18 @@ class PlayState extends FlxState {
 		}
 		for (i in 0...4) {
 			var sy:Float = downscroll ? FlxG.height - 150 : 50;
-			var o = new Strum(50 + Note.WIDTH * i, sy, i);
-			var p = new Strum(50 + Note.WIDTH * i + FlxG.width / 2, sy, i);
+			var oppStrum = new Strum(50 + Note.WIDTH * i, sy, i);
+			var plrStrum = new Strum(50 + Note.WIDTH * i + FlxG.width / 2, sy, i);
 			var slide:Float = downscroll ? -10 : 10;
-			for (st in [o, p]) {
-				st.cameras = [camHUD];
-				st.y -= slide;
-				st.alpha = 0;
-				FlxTween.tween(st, {y: st.y + slide, alpha: 1}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + 0.2 * i});
-				add(st);
+			for (strum in [oppStrum, plrStrum]) {
+				strum.cameras = [camHUD];
+				strum.y -= slide;
+				strum.alpha = 0;
+				FlxTween.tween(strum, {y: strum.y + slide, alpha: 1}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + 0.2 * i});
+				add(strum);
 			}
-			oppStrums.push(o);
-			playerStrums.push(p);
+			oppStrums.push(oppStrum);
+			playerStrums.push(plrStrum);
 		}
 		sustains = new FlxTypedGroup<FlxSprite>();
 		notes = new FlxTypedGroup<Note>();
@@ -197,11 +198,11 @@ class PlayState extends FlxState {
 		scoreTxt.cameras = [camHUD];
 		add(scoreTxt);
 		updateScore();
-		var wm = watermark = new FlxText(4, hbBG.y + 50, 0, songName + " - NORMAL | Poop Engine", 16);
-		wm.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		wm.borderSize = 1.25;
-		wm.cameras = [camHUD];
-		add(wm);
+		var wmark = watermark = new FlxText(4, hbBG.y + 50, 0, songName + " - NORMAL | Poop Engine", 16);
+		wmark.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		wmark.borderSize = 1.25;
+		wmark.cameras = [camHUD];
+		add(wmark);
 
 		callScript("onCreatePost");
 	}
@@ -237,6 +238,7 @@ class PlayState extends FlxState {
 		}
 		unspawn.sort(function(a, b) return Std.int(a.t - b.t));
 	}
+
 	function startSong():Void {
 		started = true;
 		Conductor.songPosition = 0;
@@ -263,6 +265,7 @@ class PlayState extends FlxState {
 		}
 		super.openSubState(s);
 	}
+
 	override function closeSubState():Void {
 		super.closeSubState();
 		callScript("onResume");
@@ -273,6 +276,7 @@ class PlayState extends FlxState {
 			lastTime = -1;
 		}
 	}
+
 	override function update(elapsed:Float):Void {
 		Controls.update();
 		super.update(elapsed);

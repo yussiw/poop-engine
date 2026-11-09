@@ -1,5 +1,7 @@
 package;
+
 import flixel.FlxSprite;
+
 @:keep
 class Note extends FlxSprite {
 	public static final DIRS:Array<String> = ["left", "down", "up", "right"];
@@ -15,6 +17,7 @@ class Note extends FlxSprite {
 	public var held:Bool = false;
 	public var sustain:FlxSprite = null;
 	public var tail:FlxSprite = null;
+
 	public function new(strumTime:Float, lane:Int, sustainLength:Float, mustPress:Bool) {
 		super(-1000, -1000);
 		this.strumTime = strumTime;

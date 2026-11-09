@@ -17,6 +17,10 @@
 	<architecture name="arm64" if="android" />
 	<architecture name="armv7" if="android" />
 
+	<config:android permission="android.permission.INTERNET" if="android" />
+	<config:android permission="android.permission.ACCESS_NETWORK_STATE" if="android" />
+	<config:android permission="android.permission.WAKE_LOCK" if="android" />
+	<config:android permission="android.permission.VIBRATE" if="android" />
 	<config:android permission="android.permission.READ_EXTERNAL_STORAGE" if="android" />
 	<config:android permission="android.permission.WRITE_EXTERNAL_STORAGE" if="android" />
 	<config:android permission="android.permission.MANAGE_EXTERNAL_STORAGE" if="android" />

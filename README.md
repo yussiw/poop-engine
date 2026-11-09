@@ -1,158 +1,95 @@
-# Poop Engine (Haxe / HaxeFlixel)
+Poop Engine (Haxe / HaxeFlixel)
 
-Engine inspirada na Kade Engine (chart no formato vanilla/Kade, julgamento sick/good/bad/shit, ghost tapping),
-feita pra Android: **hitbox** no gameplay e **gestos** nos menus. Compila pelo GitHub Actions
-(`.github/workflows/build.yml` -> artefato `PoopEngine-apk`).
+Poop Engine is a Friday Night Funkin' engine made with mobile devices in mind. It takes inspiration from Kade Engine, especially its chart format, note judgments and gameplay mechanics.
 
-## Controles
-- Visual identico ao da Kade/vanilla (strums oponente esq / jogador dir, healthbar, icones, score, rating popup, pausa, game over). So o input muda.
-- Gameplay: hitbox invisivel com 4 faixas verticais da tela inteira (esq/baixo/cima/dir). Toque na faixa = aperta a seta; segure pros holds.
-  Pra ver as faixas piscando: `Controls.showHitbox = true` em `source/Controls.hx`.
-- Pause: botao voltar do Android (ou tocar no cantinho superior direito, invisivel).
-- Menus: deslizar cima/baixo = navegar, toque no item selecionado = confirmar, deslizar pra direita / voltar = voltar.
-- PC (teste): D F J K, setas, ENTER, ESC.
+The engine uses touch hitboxes for gameplay and gestures for navigating menus, while keeping the familiar look and feel of the original game.
 
-## Como moddar (tudo e dado, quase nada precisa de codigo)
-| O que | Onde |
-|---|---|
-| Musicas no menu | `assets/data/songlist.json` |
-| Musica (chart) | `assets/songs/<id>/chart.json` + `Inst.ogg` + `Voices.ogg` (opcional) |
-| Script da musica | `assets/songs/<id>/script.hx` (HScript) |
-| Modchart da musica | `assets/songs/<id>/modchart.hx` (HScript; veja o exemplo em `assets/songs/demo/modchart.hx`) |
-| Script global / de stage | `assets/scripts/global.hx`, `assets/stages/<stage>.hx` |
-| Personagens | `assets/data/characters/<id>.json` (imagem, animacoes, offsets, icone, cor da barra) |
-| Stages | `assets/data/stages/<id>.json` (lista de sprites, zoom, posicao de bf/dad) |
-| Sprites/sons | `assets/images`, `assets/sounds`, `assets/music` |
+APK builds are automatically handled through GitHub Actions.
 
-### Mods (pasta externa, no estilo da Codename Engine Mobile)
-Cada mod e uma **subpasta** dentro de `mods/`, com a mesma estrutura de `assets/` (sem o prefixo `assets/`):
+Features
 
-```
-<pasta externa>/mods/MeuMod/data/characters/bf.json
-<pasta externa>/mods/MeuMod/songs/minha-musica/chart.json
-<pasta externa>/mods/MeuMod/images/menus/menuBG.png
-```
+- Kade / Vanilla chart support – Uses the familiar chart format.
+- Note judgments – Sick, Good, Bad and Shit.
+- Ghost Tapping – Can be enabled or disabled.
+- Touch Controls – Four invisible hitboxes cover the gameplay screen.
+- Gesture Navigation – Swipe to navigate menus and select options.
+- Mod Support – Load external mods with custom songs, characters, stages, scripts and more.
+- HScript Support – Customize gameplay and menus without recompiling the engine.
+- Chart Editor – Create and edit charts directly in the game.
+- Custom HUDs – Replace or modify gameplay elements through scripts.
+- Shaders – Support for custom GLSL shaders.
+- Options Menu – Gameplay, graphics, interface, controls, language and update settings.
+- In-game Updates – Check for new commits and install newer builds.
+- 3D Rendering – Additional rendering support.
 
-- **Android:** `/storage/emulated/0/.PoopEngine/mods/` (raiz do armazenamento, igual `.CodenameEngine`/`.PsychEngine`).
-  Na primeira abertura o app pede "acesso a todos os arquivos" (Android 11+) ou a permissao de armazenamento; depois de conceder, a pasta e criada sozinha.
-- **PC:** `mods/` ao lado do executavel.
-- O caminho exato aparece no canto superior direito do menu principal quando nao ha mods.
-- **Escolher o mod:** no menu principal, deslizar pra esquerda (ou TAB no PC) abre a tela de selecao (base + cada pasta de `mods/`).
-  Deslize cima/baixo, toque no item selecionado pra aplicar, deslize pra direita pra voltar. O mod escolhido fica salvo.
-- **Recarregar:** no menu principal, deslizar pra direita (ou R no PC) re-escaneia a pasta de mods. Se nao houver mods (ou faltar permissao),
-  uma faixa de aviso aparece no rodape do menu.
-- Arquivo no mod ativo substitui o do jogo base com o mesmo caminho. Pra uma musica aparecer no Freeplay,
-  o mod precisa do seu proprio `data/songlist.json` (ele substitui o da base).
-- **Mod template:** `example_mods/TemplateMod` (musica nova com `Inst.ogg`, personagem, stage, fundo do Freeplay e script). Copie a pasta inteira pra `mods/`; o `LEIA-ME.txt` dentro explica cada arquivo.
-- Tem um mod de teste em `example_mods/ExampleMod` (copie a pasta inteira pra `mods/`).
+Controls
 
-### Opcoes (categorias, como na Codename)
-Menu principal -> Opcoes -> escolha a categoria (**jogabilidade**, **graficos**, **interface**, **controles**, **idioma**, **atualizacoes**).
-Tudo e registrado em `Options.defs` (`source/Options.hx`): `downscroll`, `ghostTapping`, `splashes`, `camZooming`, `antialiasing`, `lowQuality`, `fps` (30-144),
-`fpsCounter`, `flashing`, `menuLog`, `volume`, `hitbox`, `touchCursor`, `language`, `shaders`. Salvo em `FlxG.save.data.opts` (as chaves antigas sao migradas sozinhas;
-valor salvo com tipo errado, ex.: `true` em `fps`, volta pro padrao em vez de aparecer como "FRAME RATE: TRUE"; o save e corrigido ao abrir o jogo).
-- Opcoes **bool** mostram o nome + a caixinha animada (`assets/images/menus/options/checkbox`); **int/choice** mostram `nome: valor`; **action** so o nome (toque executa `action()`).
-- Scripts e mods leem com `option("id")` / `Options.get("id")` e criam opcoes novas com `Options.register({id, category, type: "bool"|"int"|"choice", def, ...})`
-  (veja `example_mods/ScriptExample/data/states/options.hx`).
-- **Idioma:** `assets/data/lang/pt-BR.json` e `en-US.json` (`Lang.get("chave")`). Chave faltando cai no en-US. Um mod pode trazer `data/lang/<id>.json`
-  (e `Lang.available.push("<id>")` num script) pra adicionar um idioma. A fonte bold do Alphabet nao tem acento, entao nos itens grandes ele e tirado sozinho (opcoes -> opcoes).
-- **Downscroll:** inverte setas, notas e HUD. Os sustains ganham a **cauda** (`hold end`) na ponta, inclusive de ponta cabeca no downscroll.
-- **Splashes:** acertou **SICK** -> `images/game/splashes/default.png/.xml` ("note impact 1|2 <cor>") toca sobre o receptor. Mods trocam a imagem; `NoteSplash.skin`, `splashScale`, `splashAlpha` mudam via script.
+Android
 
-### Atualizacoes (GitHub)
-Opcoes -> **atualizacoes** mostra de qual commit esta build saiu (hash, mensagem, autor, data, branch, data da compilacao, plataforma) e checa na API do GitHub
-se a branch tem commits novos (`Updates.hx`; abre a categoria e ela checa sozinha uma vez por sessao; **verificar atualizacoes** checa de novo; **abrir github** abre o commit no navegador).
-- As infos vem de `GitInfo.hx`, preenchidas na **compilacao** por `macros/GitMacro.hx` (`git log`, `git rev-parse` e as variaveis `GITHUB_SHA`/`GITHUB_REF_NAME`/`GITHUB_REPOSITORY` do Actions).
-  Compilando sem a pasta `.git` (ex.: a partir de um zip) aparece "desconhecido". O repositorio vem do `remote.origin.url` (padrao `yussiw/poop-engine`), entao forks funcionam sozinhos.
-- O texto de versao no menu principal tambem mostra o hash curto. Scripts podem ler `GitInfo.short`, `GitInfo.commit`, `Updates.status`...
-- Uma categoria de mod pode ter painel de texto igual: `Options.infoPanels.set("minhaCategoria", function() return "texto");` (+ opcoes `type: "action"`).
+- Tap a lane to hit notes.
+- Hold a lane to hit sustain notes.
+- Swipe up/down to navigate menus.
+- Tap the selected item to confirm.
+- Swipe right or use the back button to return.
 
-### Atualizar dentro do jogo (Android)
-Opcoes -> atualizacoes -> **baixar e instalar atualizacao** abre a tela do `funkay.png` com a barra roxa no rodape (`states/UpdateState.hx`, logica em `Updater.hx`).
-Ele baixa o APK da release `nightly` (o workflow publica uma a cada push na branch principal), e o Android pede a confirmacao da instalacao (`java/org/poopengine/ApkInstaller.java`).
-- **O Android fecha o jogo sozinho quando termina de instalar** e nao deixa o app se reabrir; o jogador toca no icone de novo (ou em "Abrir" no instalador).
-- Na primeira vez o Android pede pra permitir "instalar apps desconhecidos" pro Poop Engine; depois de permitir, volte e toque na tela.
-- **Assinatura fixa (obrigatorio):** crie uma vez `keytool -genkey -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"`,
-  converta com `base64 -w0 debug.keystore` e salve como secret **DEBUG_KEYSTORE_BASE64** no repositorio (Settings -> Secrets -> Actions). Sem isso cada build sai assinada diferente e o Android recusa a atualizacao.
+PC
 
-### Shaders
-Arquivos GLSL em `assets/shaders/<nome>.frag` (e `.vert` opcional); um mod substitui/cria em `<mod>/shaders/`. Comece o `.frag` com `#pragma header` e use
-`flixel_texture2D(bitmap, openfl_TextureCoordv)` pra ler a imagem. Se declarar `uniform float iTime;` / `uniform vec2 iResolution;` a engine atualiza sozinha.
-```haxe
-var sh = shader("grayscale");            // FlxRuntimeShader: setFloat / setFloatArray / setInt / setBool
-sh.setFloat("amount", 1.0);
-setShader(bf, "pulse");                  // num sprite (devolve o shader)
-Shaders.setCamera(FlxG.camera, [sh]);    // na tela toda de uma camera (lista de shaders); Shaders.clearCamera(cam) tira
-```
-A opcao **graficos -> shaders** desliga tudo (as funcoes de aplicar passam a nao fazer nada). Exemplos: `assets/shaders/` (`grayscale`, `vignette`, `chromatic`) e
-`example_mods/ShaderExample`. Depende da lib `flixel-addons` (`FlxRuntimeShader`). Erro de compilacao do GLSL so aparece no log na hora do primeiro desenho.
+- D, F, J, K or arrow keys for gameplay.
+- ENTER to confirm.
+- ESC to go back.
+- TAB to open mod selection.
+- R to reload mods.
+- E to open the chart editor.
 
-### Desempenho (sem mudar a qualidade dos sprites)
-- Animacoes por prefixo (notas, setas, splashes, caixinha) sao calculadas uma vez e reaproveitadas (`Paths.addAnim`), em vez de varrer o atlas a cada nota criada.
-- `Alphabet` usa o frame da letra direto (sem um controlador de animacao por letra) e guarda os frames ja achados; `Paths.list` nao refaz `Assets.list()` a cada chamada.
-- `PlayState`: fila de notas por indice (sem `shift()`) e lista de remocao reaproveitada todo quadro (menos lixo pro GC).
-- Build: `analyzer-optimize` em release e sem a bandeja de volume do Flixel no celular.
+Modding
 
-### HScript (Script.hx) - bem mais flexivel
-- O **dono** do script (PlayState, menu...) fica em `state`/`game` e **seus campos podem ser lidos direto**: `score`, `bf`, `health`, `items`, `bg`... (pra gravar use `game.score += 100`).
-- Todas as classes comuns ja estao la: Flix* (FlxG, FlxSprite, FlxText, FlxTween, FlxEase, FlxTimer, FlxColor, FlxCamera, ...), Std/Math/Reflect/Type/Json/StringTools e as da engine
-  (Paths, Options, Lang, Conductor, Controls, Note, Strum, Character, ...). `import flixel.text.FlxText;` e `import a.b.C as D;` tambem funcionam.
-- Helpers: `rgb`, `rgba`, `point`, `add/remove/insert/addHUD`, `createSprite`, `createAnimated`, `createText`, `playSound`, `playMusic`, `timer(seg, fn, vezes)`, `tween(obj, props, dur, opts)`,
-  `image`, `sparrow`, `getText`, `getJson`, `exists`, `translate`, `option`, `switchState("menu"|"freeplay"|"options"|"mods"|"play"|"editor")`,
-  `importScript("caminho")` (junta outro .hx no mesmo escopo), `disableScript()`, `cancelEvent()`, `shared["chave"]` (mapa comum a todos os scripts), `trace(...)`.
-- Eventos do PlayState: `onCreate`, `onCreatePost`, `onUpdate`, `onUpdatePost`, `onSongStart`, `onSongEnd`, `onStepHit`, `onBeatHit`, `onCountdown(i)`, `onNoteSpawn(note)`,
-  `onNoteHitPre(note, rating)`, `onNoteHit`, `onOpponentHit`, `onMissPre(note)`, `onMiss`, `onGhostTap(lane)`, `onSplash(splash, note)`, `onPopup(rating)`, `onCameraMove(mustHit)`,
-  `onPause`, `onResume`, `onGameOver`, `onDestroy`. Os que tem "Pre", `onSongEnd`, `onCountdown`, `onSplash`, `onPopup` e `onCameraMove` aceitam `cancelEvent()` pra pular o comportamento padrao.
-- Carrega tambem `scripts/global/*.hx` e `songs/<id>/scripts/*.hx` (todos os .hx da pasta). Erros de script vao pro log e pra `Script.errors` sem derrubar o jogo.
+Most content can be customized without modifying the engine's source code.
 
-### HUD custom (`data/hud.hx`)
-`data/hud.hx` (no mod ou em `assets/`) e carregado junto dos scripts da musica. O HUD do PlayState e publico: `healthBar`, `healthBarBG`, `iconP1`, `iconP2`, `scoreTxt`, `watermark`, `accuracy`.
-Mova/esconda/troque em `onCreatePost`; `onUpdateScore(score, misses, acc)` e `onUpdateIcons(elapsed)` aceitam `cancelEvent()` pra voce escrever o texto / posicionar os icones. Exemplo: `example_mods/HudExample/`.
+Mods use their own folder structure and can include:
 
-### Customizar menus por script (`data/states/menu.hx`)
-Dentro do mod: `data/states/menu.hx` (menu principal). Tambem vale `data/states/global.hx` (todo menu com scripts), `data/states/options.hx` e `data/states/menu/*.hx`.
-Eventos do menu: `onCreate` (antes de montar: mexa em `menuItems`, `itemStartY`, `itemSpacing`), `onCreatePost` (depois: `bg`, `items`, `magenta`, `versionTxt`...),
-`onUpdate`, `onChange(i, id)`, `onSelect(i, id)` (`cancelEvent()` = voce cuida da acao), `onDestroy`.
-Cada item de `menuItems` e `{id, file, idle, selected, action}` (`action` = nome de state ou funcao). Exemplo completo: `example_mods/ScriptExample/`.
-Outras telas podem ganhar o mesmo recurso com `new StateScript(this, "nome")` (veja `OptionsState.hx` e `MainMenuState.hx`).
+- Songs and charts
+- Characters and stages
+- Images, sounds and music
+- HScript scripts
+- Modcharts
+- Custom HUDs
+- Menu modifications
+- Languages
+- Shaders
+- Custom options
 
-### Editor de chart
-Toque em **[ EDITOR DE CHART ]** no canto superior esquerdo do menu principal (ou tecla E no PC). Escolha uma musica ou "+ nova musica".
-Visual minimalista com fonte normal (`assets/fonts/ui.ttf`, so o editor usa; o resto do jogo continua com a vcr).
+On Android, mods are stored in:
 
-- **Grade quadrada:** cada celula = 1 step de altura x 1 coluna de largura. Notas e receptores ocupam a celula inteira, entao a nota encaixa certinho no receptor quando passa pela linha branca. O **zoom** (75% a 150%) escala a grade toda, entao ela continua quadrada. Linhas: fina = step, media = beat (4 steps), grossa = secao (16 steps); o **snap** (1/4 a 1/64) soma linhas de subdivisao.
-- **Linha do tempo continua** (como a Codename): a grade rola sem divisao de secoes; os receptores ficam fixos na linha branca e a musica passa por eles no PLAY.
-- **Colunas absolutas:** esquerda = OPONENTE, direita = JOGADOR. A faixa colorida a esquerda da grade e o **foco da camera** de cada secao (azul = jogador, rosa = oponente); toque nela (ou em *Camera* na aba Secao) pra alternar. Ao salvar, o editor converte tudo pro formato Kade/vanilla (`mustHitSection`) sem mudar nenhuma nota de lado.
-- **Painel esquerdo (sempre visivel):** Reproduzir/Pausar, tempo, Inicio / Secao anterior / proxima, ferramenta (**Nota**, **Selecao**, **Caixa**), Snap, Zoom, Desfazer/Refazer, Copiar/Colar/Apagar e mover a selecao (setas). Botoes que nao se aplicam (ex.: Copiar sem selecao) ficam apagados.
-- **Painel direito (3 abas):** **Secao** (camera, copiar da anterior, selecionar secao, limpar secao), **Audio** (metronomo, som ao passar nas notas, vozes, instrumental), **Musica** (BPM e velocidade).
-- **Topo:** voltar, **Testar** (salva e abre a musica) e **Salvar** (grava em `<mod ativo>/songs/<id>/chart.json` e inclui a musica no `songlist.json` do mod). **Barra da direita** = minimapa da musica inteira (arraste pra pular pra qualquer ponto).
-- **Nota:** toque = poe/tira nota; arraste uma nota **pra baixo** = sustain; arraste no vazio = rola (com inercia). **Selecao:** toque marca/desmarca. **Caixa:** arraste um retangulo.
-- Eventos (lane -1) e notas fora da grade de charts importados ficam guardados e **voltam no arquivo ao salvar** (nao aparecem na grade).
-- Precisa de um mod ativo pra salvar (a base e somente leitura). Musica nova recebe o id `nova-musica-N`; ponha seu `Inst.ogg` em `songs/<id>/`.
-- PC: ESPACO play, setas = rolar/secao, 1-8 poe nota no playhead, Ctrl+Z / Ctrl+Y / Ctrl+S / Ctrl+C / Ctrl+V, DELETE, roda do mouse.
+"/storage/emulated/0/.PoopEngine/mods/"
 
-### Transicoes (TransitionSubState)
-`source/states/TransitionSubState.hx`: cortina preta com borda em degrade que desce cobrindo a tela e, na tela nova, desce de novo revelando. Use
-`TransitionSubState.go(new MeuState())` no lugar de `FlxG.switchState(new MeuState())`. A parte de "entrada" abre sozinha (gancho em `Main`).
-Funciona tambem a partir de um substate (ex.: sair da pausa). Duracao em `TransitionSubState.DURATION`.
+On PC, they are stored in a "mods/" folder next to the executable.
 
-### Chart (formato Kade/vanilla)
-`{"song":{"bpm":102,"speed":2,"player1":"bf","player2":"dad","stage":"default","notes":[{"mustHitSection":true,"sectionNotes":[[tempoMs, lane0-7, duracaoHoldMs]]}]}}`
+Files inside an active mod can replace their corresponding base-game files.
 
-### Hooks de script
-`onCreate, onCreatePost, onSongStart, onUpdate(elapsed), onStepHit(step), onBeatHit(beat), onNoteHit(note, rating), onOpponentHit(note), onMiss(note)`
-Variaveis: `game` (PlayState), `FlxG, FlxSprite, FlxTween, FlxEase, Paths, Conductor, Math, Std, rgb(r,g,b), add(), addHUD(), remove()`.
+You can find example mods in the "example_mods/" directory.
 
-## Android: aparelhos antigos e novos
-Configurado em `Project.xml`:
-- **targetSdk 35 / minSdk 21** (Android 5.0+). O aviso do Play Protect "app criado para uma versao antiga do Android" aparece quando o target esta mais de 2 niveis abaixo do Android do aparelho; com 35 ele some em aparelhos ate o Android 17.
-  Se o Gradle do CI reclamar do SDK 35, troque `target-sdk-version` pra 34 (cobre ate o Android 16).
-- **arm64 + armv7:** o Lime 8.1.2 so gera arm64 por padrao, o que deixaria de fora aparelhos 32 bits antigos. Os dois sao gerados (o build demora mais). Pra emulador x86_64, acrescente `<architecture name="x64" if="android" />`.
-- Permissoes `READ_MEDIA_*` declaradas (Android 13+); `MANAGE_EXTERNAL_STORAGE` continua pra pasta de mods.
-- Obs.: em aparelhos que usam paginas de memoria de 16 KB, o Android pode avisar sobre bibliotecas nativas nao alinhadas. Resolver isso pede Lime 8.3+ (NDK r28c); o workflow atual segue no Lime 8.1.2 / NDK r21e.
+Chart Editor
 
-## Observacoes
-- `assets/images/characters/dad.png` veio sem `dad.xml`, entao o oponente de exemplo usa o sprite do BF espelhado.
-- A musica demo usa `music/freakyMenu.ogg` (102 BPM) como Inst, pois o zip nao tinha musicas de verdade.
-- Mudancas de BPM no meio da musica nao sao suportadas (as notas funcionam, so o "bop" de camera/icones nao acompanha).
-- Story Mode / Options / Credits abrem uma tela "Em breve" (o zip nao tinha os assets dessas telas). Sem downscroll; hold sem "cap" final.
+The engine includes a built-in chart editor with a timeline-based layout.
+
+It supports note placement, sustain notes, selection tools, snapping, zoom, audio playback, BPM settings and section camera control.
+
+Charts are saved in the Kade / Vanilla format, making them compatible with the engine's chart system.
+
+Updates
+
+Poop Engine includes a GitHub update system.
+
+The update menu displays information about the build, including its commit hash, author, branch and build date. It can also check for newer commits and download the latest nightly APK directly from the game.
+
+Builds are generated automatically through GitHub Actions.
+
+Credits
+
+- yussiw – Engine development.
+- Codename Engine – Assets and original resources used in the project.
+- Kade Engine – Inspiration and code reference.
+
+Development Status
+
+Poop Engine is still a work in progress. Features and systems may change as development continues.

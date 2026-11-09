@@ -1,4 +1,5 @@
 package;
+
 import flixel.FlxG;
 import flixel.FlxGame;
 import openfl.display.FPS;
@@ -9,6 +10,7 @@ import states.TransitionSubState;
 class Main extends Sprite {
 	static var instance:Main;
 	static var fpsDisplay:FPS;
+
 	public function new() {
 		super();
 		instance = this;
@@ -26,6 +28,7 @@ class Main extends Sprite {
 		FlxG.mouse.visible = false;
 		#end
 	}
+
 	public static function setFpsVisible(v:Bool):Void {
 		if (instance == null)
 			return;
