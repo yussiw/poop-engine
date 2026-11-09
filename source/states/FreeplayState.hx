@@ -7,8 +7,6 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.math.FlxMath;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
-
-/** Freeplay igual ao da vanilla/Kade. Swipe cima/baixo troca, toque na selecionada joga, swipe direita volta. */
 class FreeplayState extends FlxState {
 	static var curSelected:Int = 0;
 
@@ -71,7 +69,6 @@ class FreeplayState extends FlxState {
 		for (i in 0...icons.length)
 			icons[i].alpha = i == curSelected ? 1 : 0.6;
 	}
-
 	function accept():Void {
 		if (leaving)
 			return;

@@ -6,13 +6,11 @@ import flixel.FlxSubState;
 import flixel.util.FlxColor;
 import flixel.util.FlxTimer;
 
-/** Game over da Kade: BF morrendo na tela preta, toque = tentar de novo, swipe direita/voltar = sair. */
 class GameOverSubState extends FlxSubState {
 	var dead:Character;
 	var camFollow:FlxObject;
 	var confirmed:Bool = false;
 	var lock:Float = 0.6;
-
 	public function new(x:Float, y:Float, camFollow:FlxObject) {
 		super();
 		this.camFollow = camFollow;
@@ -25,7 +23,6 @@ class GameOverSubState extends FlxSubState {
 		FlxG.sound.play(Paths.sfx("gameOverSFX"));
 		FlxG.camera.follow(camFollow, LOCKON, 0.01);
 	}
-
 	override function update(elapsed:Float):Void {
 		Controls.update();
 		super.update(elapsed);

@@ -8,31 +8,20 @@ enum UpdateStatus {
 	Idle;
 	Checking;
 	UpToDate;
-	/** n commits novos no GitHub */
 	Behind(n:Int);
-	/** esta build tem commits que o GitHub (ainda) nao tem */
 	Ahead;
-	/** o commit desta build nao existe no GitHub; so mostramos o ultimo de la */
+
 	Unknown;
 	Failed;
 }
-
-/**
- * Liga a engine ao repositorio do GitHub: sabe de qual commit esta build saiu (GitInfo) e pergunta a API publica do
- * GitHub se existe commit mais novo na branch. Tudo e assincrono; a tela de opcoes (categoria "updates") le os
- * campos daqui e redesenha quando `revision` muda.
- */
 class Updates {
 	public static var status:UpdateStatus = Idle;
-	/** sobe a cada mudanca de estado, pra UI saber que precisa redesenhar */
 	public static var revision:Int = 0;
 	public static var latestSha:String = "";
 	public static var latestMessage:String = "";
 	public static var latestDate:String = "";
-
 	static var req:HTTPRequest<String>;
 
-	/** versao do app (Project.xml) */
 	public static function version():String {
 		var v:String = null;
 		try {
@@ -46,11 +35,9 @@ class Updates {
 
 	public static function openRepo():Void
 		FlxG.openURL(GitInfo.hasCommit ? repoUrl() + "/commit/" + GitInfo.commit : repoUrl());
-
 	static function bump():Void
 		revision++;
 
-	/** Pergunta ao GitHub se a branch tem commits depois do desta build. */
 	public static function check():Void {
 		if (status == Checking)
 			return;
@@ -63,12 +50,10 @@ class Updates {
 			fallbackLatest(api);
 	}
 
-	/** Chamado ao abrir a categoria: checa sozinho uma vez por sessao. */
 	public static function onOpen():Void {
 		if (status == Idle)
 			check();
 	}
-
 	static function fallbackLatest(api:String):Void {
 		get(api + "/commits/" + GitInfo.branch, function(text:String) {
 			try {
@@ -90,7 +75,7 @@ class Updates {
 			var j:Dynamic = Json.parse(text);
 			var commits:Array<Dynamic> = j.commits;
 			if (commits != null && commits.length > 0)
-				readCommit(commits[commits.length - 1]); // a lista vem do mais antigo pro mais novo
+				readCommit(commits[commits.length - 1]);
 			var st:String = j.status;
 			var n:Int = j.ahead_by == null ? 0 : Std.int(j.ahead_by);
 			status = switch (st) {
@@ -115,7 +100,6 @@ class Updates {
 			latestDate = who != null && who.date != null ? StringTools.replace(Std.string(who.date).substr(0, 16), "T", " ") : "";
 		}
 	}
-
 	static function get(url:String, ok:String->Void, fail:Dynamic->Void):Void {
 		try {
 			var r = new HTTPRequest<String>(url);
@@ -129,7 +113,6 @@ class Updates {
 		}
 	}
 
-	// ------------------------------------------------------------------ texto da tela de opcoes
 	static inline function unk():String
 		return Lang.get("upd.unknown");
 

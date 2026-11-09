@@ -1,5 +1,4 @@
 package states;
-
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
@@ -7,13 +6,11 @@ import flixel.math.FlxMath;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 
-/** Lista de musicas (assets/data/songlist.json). Gestos: swipe cima/baixo troca, toque no item selecionado joga. */
 class MenuState extends FlxState {
 	var items:Array<FlxText> = [];
 	var ids:Array<String> = [];
 	var sel:Int = 0;
 	var leaving:Bool = false;
-
 	override function create():Void {
 		super.create();
 		if (FlxG.sound.music == null || !FlxG.sound.music.playing)
@@ -33,7 +30,6 @@ class MenuState extends FlxState {
 			items.push(t);
 			add(t);
 		}
-
 		var title = new FlxText(0, 20, FlxG.width, "POOP ENGINE", 40);
 		title.setFormat(Paths.font("vcr.ttf"), 40, FlxColor.WHITE, FlxTextAlign.CENTER);
 		add(title);

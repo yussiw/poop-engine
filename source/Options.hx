@@ -1,14 +1,6 @@
 package;
-
 import flixel.FlxG;
 
-/**
- * Definicao de uma opcao. type: "bool" | "int" | "choice" | "info" | "action".
- *   name/desc = chave de traducao (Lang) ou texto literal.
- *   choices (type choice) = ids; o texto mostrado vem da chave "<id>.<choice>" se existir.
- *   info   = linha so de leitura: `value` e uma funcao que devolve o texto mostrado depois do nome.
- *   action = item que executa `action()` ao ser tocado (sem valor salvo).
- */
 typedef OptionDef = {
 	var id:String;
 	var category:String;
@@ -20,29 +12,19 @@ typedef OptionDef = {
 	@:optional var max:Float;
 	@:optional var step:Float;
 	@:optional var suffix:String;
+	@:optional var mult:Float;
 	@:optional var choices:Array<String>;
 	@:optional var name:String;
 	@:optional var desc:String;
 }
 
-/**
- * Opcoes do jogador (salvas em FlxG.save.data.opts). Chame Options.load() no Main, depois do FlxG.save.bind.
- *
- * Todas as opcoes sao registradas em `defs` e agrupadas por categoria (igual a Codename). Mods e scripts
- * podem criar opcoes novas com Options.register({...}) e ler com Options.get("id").
- * Os campos estaticos abaixo sao so atalhos tipados das opcoes embutidas.
- */
 class Options {
-	/** ordem das categorias no menu de opcoes. Categorias novas (de mods) entram no fim. */
+
 	public static var categories:Array<String> = ["gameplay", "graphics", "interface", "controls", "language", "updates"];
 
-	/** categorias que mostram um painel de texto (funcao que devolve o texto) em vez de so a lista. Ex.: "updates". */
 	public static var infoPanels:Map<String, Void->String> = new Map();
-
 	public static var defs:Array<OptionDef> = [];
 	static var values:Map<String, Dynamic> = new Map();
-
-	// ---- atalhos (mantidos em sincronia por sync()) ----
 	public static var volume10:Int = 10;
 	public static var touchCursor:Bool = false;
 	public static var flashing:Bool = true;
@@ -57,40 +39,33 @@ class Options {
 	public static var fpsCounter:Bool = false;
 	public static var fps:Int = 60;
 	public static var language:String = "pt-BR";
-
 	static var inited:Bool = false;
-
 	static function builtin():Void {
-		// gameplay
+
 		register({id: "downscroll", category: "gameplay", type: "bool", def: false});
 		register({id: "ghostTapping", category: "gameplay", type: "bool", def: true});
 		register({id: "splashes", category: "gameplay", type: "bool", def: true});
 		register({id: "camZooming", category: "gameplay", type: "bool", def: true});
-		// graficos
 		register({id: "antialiasing", category: "graphics", type: "bool", def: true});
 		register({id: "lowQuality", category: "graphics", type: "bool", def: false});
 		register({id: "shaders", category: "graphics", type: "bool", def: true});
 		register({id: "fps", category: "graphics", type: "choice", def: "60", choices: ["30", "60", "90", "120", "144"]});
 		register({id: "fpsCounter", category: "graphics", type: "bool", def: false});
 		register({id: "flashing", category: "graphics", type: "bool", def: true});
-		// interface
 		register({id: "menuLog", category: "interface", type: "bool", def: true});
-		register({id: "volume", category: "interface", type: "int", def: 10, min: 0, max: 10, step: 1, suffix: "0%"});
-		// controles
+		register({id: "volume", category: "interface", type: "int", def: 10, min: 0, max: 10, step: 1, mult: 10, suffix: "%"});
+
 		register({id: "hitbox", category: "controls", type: "bool", def: false});
 		register({id: "touchCursor", category: "controls", type: "bool", def: false});
-		// idioma
+
 		register({id: "language", category: "language", type: "choice", def: "pt-BR", choices: Lang.available});
-		// atualizacoes (info do commit + checagem no GitHub; ver Updates.hx)
 		register({id: "updCheck", category: "updates", type: "action", action: function() Updates.check()});
 		register({id: "updGithub", category: "updates", type: "action", action: function() Updates.openRepo()});
 		infoPanels.set("updates", Updates.panelText);
 	}
 
-	/**
-	 * Garante que o valor tem o tipo certo pra opcao. Saves antigos (ou de outra versao da engine) podiam ter, por exemplo,
-	 * `true` em "fps"/"volume" e `false` em "language", e a tela mostrava "FRAME RATE: TRUE". Valor invalido volta pro padrao.
-	 */
+	static function isLocale(t:String):Bool
+		return t != null && ~/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.match(t) && t.toLowerCase() != "true" && t.toLowerCase() != "false";
 	static function coerce(d:OptionDef, v:Dynamic):Dynamic {
 		switch (d.type) {
 			case "bool":
@@ -114,19 +89,19 @@ class Options {
 				var hi:Float = d.max == null ? 1e9 : d.max;
 				return Std.int(Math.max(lo, Math.min(hi, n)));
 			case "choice":
-				if (v == null || !Std.isOfType(v, String))
+				if (v == null || Std.isOfType(v, Bool))
 					return d.def;
 				var t = Std.string(v);
+				if (d.id == "language")
+					return (Lang.available.indexOf(t) >= 0 || isLocale(t)) ? t : d.def;
 				if (d.choices != null && d.choices.indexOf(t) >= 0)
 					return t;
-				// idiomas vindos de mods so entram em Lang.available depois (ver sync()), entao aceita qualquer texto
-				return (d.id == "language" && t != "") ? t : d.def;
+				return d.def;
 			default:
 				return v;
 		}
 	}
 
-	/** Registra (ou substitui) uma opcao. Chamavel de scripts: Options.register({id: "x", category: "mod", type: "bool", def: true}). */
 	public static function register(d:OptionDef):Void {
 		for (i in 0...defs.length)
 			if (defs[i].id == d.id) {
@@ -153,12 +128,11 @@ class Options {
 	}
 
 	public static function get(id:String):Dynamic {
-		if (values.exists(id))
-			return values.get(id);
 		var d = find(id);
-		return d == null ? null : d.def;
+		if (d == null)
+			return values.get(id);
+		return coerce(d, values.exists(id) ? values.get(id) : d.def);
 	}
-
 	public static function set(id:String, v:Dynamic):Void {
 		var d = find(id);
 		if (d != null)
@@ -174,11 +148,9 @@ class Options {
 		sync();
 	}
 
-	/** Avanca a opcao pro proximo valor (bool alterna, int cicla min..max, choice cicla a lista). */
 	public static function cycle(d:OptionDef, dir:Int = 1):Void {
 		switch (d.type) {
 			case "info", "action":
-				// sem valor pra ciclar (action: use Options.trigger)
 				return;
 			case "bool":
 				set(d.id, !(get(d.id) == true));
@@ -196,18 +168,18 @@ class Options {
 		}
 	}
 
-	/** Texto do valor atual ("on"/"off" traduzidos, numero + sufixo, ou o nome da escolha). */
 	public static function valueText(d:OptionDef):String {
 		var v = get(d.id);
 		return switch (d.type) {
 			case "info", "action": d.value != null && Reflect.isFunction(d.value) ? Std.string(Reflect.callMethod(null, d.value, [])) : "";
 			case "bool": Lang.get(v == true ? "common.on" : "common.off");
-			case "int": Std.string(v) + (d.suffix == null ? "" : d.suffix);
+			case "int":
+				var m:Float = d.mult == null ? 1 : d.mult;
+				Std.string(Std.int(Std.parseFloat(Std.string(v)) * m)) + (d.suffix == null ? "" : d.suffix);
 			default: Lang.get(d.id + "." + Std.string(v), Std.string(v));
 		}
 	}
 
-	/** Executa a funcao de uma opcao do tipo "action". */
 	public static function trigger(d:OptionDef):Void {
 		if (d.action != null && Reflect.isFunction(d.action))
 			Reflect.callMethod(null, d.action, []);
@@ -219,7 +191,6 @@ class Options {
 			builtin();
 		}
 		var d = FlxG.save.data;
-		// migracao das chaves antigas (antes de existirem categorias)
 		var legacy = ["optHitbox" => "hitbox", "optTouchCursor" => "touchCursor", "optFlashing" => "flashing", "optMenuLog" => "menuLog", "optVolume" => "volume"];
 		for (k => id in legacy)
 			if (Reflect.field(d, k) != null) {
@@ -234,11 +205,22 @@ class Options {
 				var def = find(f);
 				values.set(f, def == null ? raw : coerce(def, raw));
 			}
+		heal();
 		sync();
 		FlxG.sound.volume = volume10 / 10;
 	}
+	static function heal():Void {
+		var o:Dynamic = FlxG.save.data.opts;
+		if (o == null)
+			return;
+		for (f in Reflect.fields(o)) {
+			var d = find(f);
+			if (d != null)
+				Reflect.setField(o, f, coerce(d, Reflect.field(o, f)));
+		}
+		FlxG.save.flush();
+	}
 
-	/** Copia os valores do mapa pros campos estaticos e aplica efeitos globais (fps, idioma, antialiasing...). */
 	public static function sync():Void {
 		volume10 = Std.int(Math.max(0, Math.min(10, Std.parseFloat(Std.string(get("volume"))))));
 		touchCursor = get("touchCursor") == true;
@@ -256,7 +238,7 @@ class Options {
 		var f = Std.parseInt(Std.string(get("fps")));
 		fps = f == null || f < 15 ? 60 : f;
 		var lg = Std.string(get("language"));
-		if (Lang.available.indexOf(lg) < 0)
+		if (Lang.available.indexOf(lg) < 0 && isLocale(lg))
 			Lang.available.push(lg);
 		if (lg != language || !Lang.loaded) {
 			language = lg;

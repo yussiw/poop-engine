@@ -1,6 +1,5 @@
 #pragma header
 
-// iTime e atualizado sozinho pela engine (segundos). Serve em sprites: o brilho pulsa.
 uniform float iTime;
 uniform float speed;
 

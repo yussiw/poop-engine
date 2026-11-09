@@ -2,15 +2,9 @@ package;
 
 import haxe.Json;
 
-/**
- * Traducao. Os textos ficam em assets/data/lang/<id>.json (mapa chave -> texto). Mods podem trocar/criar
- * arquivos em <mod>/data/lang/. Chaves que faltam caem no en-US e, por fim, na propria chave (ou no `def`).
- * Uso: Lang.get("options.title"), Lang.get("pause.score", "x") ou com variaveis: Lang.fmt("menu.mods", ["n" => "3"]) ("{n}").
- */
 class Lang {
 	public static var loaded:Bool = false;
 	public static var current:String = "pt-BR";
-	/** idiomas conhecidos (aparecem na opcao de idioma). Mods podem adicionar: Lang.available.push("es-ES"). */
 	public static var available:Array<String> = ["pt-BR", "en-US"];
 
 	static var table:Dynamic = {};

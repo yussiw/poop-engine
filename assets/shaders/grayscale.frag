@@ -1,6 +1,5 @@
 #pragma header
 
-// amount: 0 = cor normal, 1 = preto e branco (defina com setFloat("amount", 1.0))
 uniform float amount;
 
 void main() {

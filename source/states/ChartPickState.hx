@@ -7,7 +7,6 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 
-/** Escolha da musica pro editor de chart: "+ nova musica" + as musicas do songlist.json do mod ativo (ou da base). */
 class ChartPickState extends FlxState {
 	var ids:Array<String> = [""];
 	var names:Array<String> = ["+ nova musica"];
@@ -24,7 +23,6 @@ class ChartPickState extends FlxState {
 		bg.color = 0xFF55AA77;
 		bg.antialiasing = Options.antialiasing;
 		add(bg);
-
 		var list:Array<Dynamic> = Paths.json("data/songlist.json");
 		if (list != null)
 			for (e in list) {

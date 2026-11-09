@@ -9,20 +9,16 @@ import flixel.text.FlxText;
 import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 import flixel.util.FlxColor;
-
-/** Pausa igual a da Kade: fundo preto 0.6, nome da musica/dificuldade no canto, Alphabet com Resume / Restart Song / Exit to menu. */
 class PauseSubState extends FlxSubState {
 	var cam:FlxCamera;
 	var names:Array<String> = [];
 	var items:FlxTypedGroup<Alphabet>;
 	var sel:Int = 0;
 	var lock:Float = 0.4;
-
 	public function new(cam:FlxCamera) {
 		super();
 		this.cam = cam;
 	}
-
 	override function create():Void {
 		super.create();
 		names = [Lang.get("pause.resume"), Lang.get("pause.restart"), Lang.get("pause.exit")];
@@ -44,7 +40,6 @@ class PauseSubState extends FlxSubState {
 		FlxTween.tween(bg, {alpha: 0.6}, 0.4, {ease: FlxEase.quartInOut});
 		FlxTween.tween(info, {alpha: 1, y: 20}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.3});
 		FlxTween.tween(diff, {alpha: 1, y: diff.y + 5}, 0.4, {ease: FlxEase.quartInOut, startDelay: 0.5});
-
 		items = new FlxTypedGroup<Alphabet>();
 		add(items);
 		for (i in 0...names.length) {
@@ -68,7 +63,6 @@ class PauseSubState extends FlxSubState {
 			a.alpha = a.targetY == 0 ? 1 : 0.6;
 		}
 	}
-
 	function accept():Void {
 		switch (sel) {
 			case 0:
@@ -79,7 +73,6 @@ class PauseSubState extends FlxSubState {
 				TransitionSubState.go(new FreeplayState());
 		}
 	}
-
 	override function update(elapsed:Float):Void {
 		Controls.update();
 		super.update(elapsed);

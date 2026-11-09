@@ -6,7 +6,6 @@ import flixel.FlxSprite;
 class Strum extends FlxSprite {
 	public var lane:Int;
 	public var resetTimer:Float = 0;
-
 	public function new(x:Float, y:Float, lane:Int) {
 		super(x, y);
 		this.lane = lane;

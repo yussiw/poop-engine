@@ -1,5 +1,4 @@
 package states;
-
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
@@ -15,10 +14,8 @@ import openfl.media.Sound;
 import sys.io.File;
 #end
 
-/** Nota do editor. step e sus ficam em STEPS (16 por secao); convertidos pra ms so ao salvar. lane 0-3 = oponente, 4-7 = jogador (absoluto). */
 typedef EdNote = {step:Float, lane:Int, sus:Float};
 
-/** Botao do editor. st: 0 normal, 1 principal, 2 perigo, 3 segmento/aba (act = selecionado), 4 liga/desliga (act = ligado). tab: -1 sempre visivel, 0..2 so na aba da direita. */
 typedef EdBtn = {
 	spr:FlxSprite,
 	txt:FlxText,
@@ -33,47 +30,31 @@ typedef EdBtn = {
 	act:Bool,
 	on:Bool
 };
-
 typedef EdTabText = {t:FlxText, tab:Int};
 typedef EdPool = {arr:Array<FlxSprite>, grp:FlxTypedGroup<FlxSprite>, n:Int};
 typedef EdSnap = {notes:Array<EdNote>, must:Array<Bool>};
 typedef EdExtra = {t:Float, arr:Array<Dynamic>};
 typedef EdClip = {d:Float, lane:Int, sus:Float};
-
-/**
- * Editor de chart pensado pra toque, no estilo "linha do tempo continua" (como o da Codename):
- *  - a grade rola sem parar; os receptores ficam fixos e a musica passa por eles ao tocar
- *  - cada celula da grade e um QUADRADO (1 step de altura x 1 coluna de largura); notas e receptores ocupam a celula inteira
- *  - colunas absolutas: esquerda = OPONENTE (0-3), direita = JOGADOR (4-7)
- *  - a faixa da esquerda da grade e o FOCO DA CAMERA de cada secao (era o "mustHitSection"); tocar nela alterna
- *  - snap (1/4 ... 1/64), zoom (a grade inteira escala junto, entao continua quadrada), desfazer/refazer, selecao, copiar/colar, mover
- *  - arrastar uma nota pra baixo cria o sustain; arrastar no vazio rola a grade
- * Salva em <mod ativo>/songs/<id>/chart.json (formato Kade/vanilla) e inclui a musica no songlist.json do mod.
- */
 class ChartEditorState extends FlxState {
 	public static var songId:String = "demo";
 	public static var isNew:Bool = false;
 	public static var newName:String = "Nova Musica";
 
-	/** aba aberta no painel da direita (lembrada enquanto o app estiver aberto). */
 	static var rightTab:Int = 0;
 
-	// ---- layout (1280x720)
-	static inline var CELL:Int = 44; // lado da celula com zoom 100%
-	static inline var CAMW:Int = 36; // largura da faixa do foco da camera
-	static inline var CX:Int = 640; // centro horizontal da grade
-	static inline var GY0:Int = 56; // topo da area da grade
-	static inline var GH:Int = 640; // altura da area da grade
-	static inline var PH:Int = 176; // y da linha de tempo atual (topo da celula dos receptores)
-	static inline var STEPS:Int = 16; // steps por secao
-	static inline var LX:Int = 16; // painel esquerdo
+	static inline var CELL:Int = 44;
+	static inline var CAMW:Int = 36;
+	static inline var CX:Int = 640;
+	static inline var GY0:Int = 56;
+	static inline var GH:Int = 640;
+	static inline var PH:Int = 176;
+	static inline var STEPS:Int = 16;
+	static inline var LX:Int = 16;
 	static inline var LW:Int = 292;
-	static inline var RX:Int = 968; // painel direito
+	static inline var RX:Int = 968;
 	static inline var RW:Int = 252;
-	static inline var SEEK_X:Int = 1232; // minimapa
+	static inline var SEEK_X:Int = 1232;
 	static inline var SEEK_W:Int = 28;
-
-	// ---- paleta
 	static inline var C_BG:Int = 0xFF0E0F13;
 	static inline var C_PANEL:Int = 0xFF15161B;
 	static inline var C_BTN:Int = 0xFF1F2128;
@@ -89,26 +70,24 @@ class ChartEditorState extends FlxState {
 	static final ZOOMS:Array<Float> = [0.75, 1.0, 1.25, 1.5];
 	static final NUM_KEYS:Array<FlxKey> = [FlxKey.ONE, FlxKey.TWO, FlxKey.THREE, FlxKey.FOUR, FlxKey.FIVE, FlxKey.SIX, FlxKey.SEVEN, FlxKey.EIGHT];
 
-	// ---- dados
 	var songObj:Dynamic;
 	var songName:String = "";
 	var bpm:Float = 102;
 	var speed:Float = 2;
 	var notes:Array<EdNote> = [];
-	var extras:Array<EdExtra> = []; // eventos / notas fora da grade: preservados ao salvar
-	var must:Array<Bool> = [true]; // foco da camera por secao (true = jogador)
+	var extras:Array<EdExtra> = [];
+	var must:Array<Bool> = [true];
 	var sel:Array<EdNote> = [];
 	var clip:Array<EdClip> = [];
 	var undoS:Array<EdSnap> = [];
 	var redoS:Array<EdSnap> = [];
 
-	// ---- estado
-	var curT:Float = 0; // ms
+	var curT:Float = 0;
 	var zoomIdx:Int = 1;
-	var cw:Float = CELL; // lado da celula (largura da coluna = altura de um step)
-	var gx:Float = CX - 4 * CELL; // x da borda esquerda das 8 colunas
+	var cw:Float = CELL;
+	var gx:Float = CX - 4 * CELL;
 	var quantIdx:Int = 3;
-	var tool:Int = 0; // 0 nota, 1 selecao, 2 caixa
+	var tool:Int = 0;
 	var dirty:Bool = false;
 	var exitArmed:Bool = false;
 	var playing:Bool = false;
@@ -121,14 +100,10 @@ class ChartEditorState extends FlxState {
 	var hitOn:Bool = true;
 	var voicesOn:Bool = true;
 	var instOn:Bool = true;
-
-	// ---- audio
 	var inst:FlxSound;
 	var voices:FlxSound;
 	var hitSnd:Sound;
 	var metroSnd:Sound;
-
-	// ---- visual
 	var bgPool:EdPool;
 	var linePool:EdPool;
 	var camPool:EdPool;
@@ -167,16 +142,14 @@ class ChartEditorState extends FlxState {
 	var voicesBtn:EdBtn;
 	var instBtn:EdBtn;
 	var focusBtn:EdBtn;
-
-	// ---- ponteiro (um dedo / mouse)
 	var activeId:Int = -99;
 	var px:Float = 0;
 	var py:Float = 0;
 	var pJust:Bool = false;
 	var pHeld:Bool = false;
 	var pUp:Bool = false;
-	var gKind:Int = 0; // 0 nada, 1 botao, 2 barra de busca, 3 grade
-	var gMode:Int = 0; // 0 pendente, 1 rolar, 2 sustain, 3 caixa
+	var gKind:Int = 0;
+	var gMode:Int = 0;
 	var gSX:Float = 0;
 	var gSY:Float = 0;
 	var gSCurT:Float = 0;
@@ -189,17 +162,14 @@ class ChartEditorState extends FlxState {
 		super.create();
 		if (FlxG.sound.music != null)
 			FlxG.sound.music.stop();
-
 		loadChart();
 		Conductor.setBpm(bpm);
-
 		hitSnd = Paths.sfx("menu/volume");
 		metroSnd = Paths.sfx("tick");
 
 		var bg = new FlxSprite(0, 0).makeGraphic(FlxG.width, FlxG.height, C_BG, true);
 		add(bg);
 
-		// ---- audio
 		var snd = Paths.audio('songs/$songId/Inst.ogg');
 		hasInst = snd != null;
 		if (snd == null)
@@ -209,7 +179,6 @@ class ChartEditorState extends FlxState {
 		if (vs != null)
 			voices = FlxG.sound.load(vs);
 
-		// ---- grade (ordem de desenho: fundo, linhas, foco, selecao, sustains, receptores, notas, linha atual)
 		bgPool = mkPool();
 		linePool = mkPool();
 		camPool = mkPool();
@@ -238,12 +207,10 @@ class ChartEditorState extends FlxState {
 		boxSpr.alpha = 0.3;
 		boxSpr.visible = false;
 		add(boxSpr);
-
 		buildUi();
 		applyZoom();
 		rebuildMap();
 		setTime(0);
-
 		var mod = Paths.currentMod();
 		var dir = (mod == "" ? "<seu mod>" : mod) + "/songs/" + songId + "/";
 		if (!hasInst)
@@ -252,7 +219,6 @@ class ChartEditorState extends FlxState {
 			setStatus("Pronto. Toque na grade pra pôr/tirar notas, arraste no vazio pra rolar.");
 	}
 
-	// ------------------------------------------------------------------ carregar
 	function loadChart():Void {
 		var raw:Dynamic = isNew ? null : Paths.json('songs/$songId/chart.json');
 		if (raw == null) {
@@ -286,10 +252,10 @@ class ChartEditorState extends FlxState {
 			for (n in sn) {
 				var lane = Std.int(n[1]);
 				if (lane < 0 || lane > 7) {
-					extras.push({t: n[0], arr: n}); // eventos: ficam guardados e voltam no save
+					extras.push({t: n[0], arr: n});
 					continue;
 				}
-				var isP = lane < 4 ? m : !m; // mesma regra do PlayState
+				var isP = lane < 4 ? m : !m;
 				var sus:Float = (n[2] != null && n[2] > 0) ? n[2] / sc : 0;
 				notes.push({step: n[0] / sc, lane: (isP ? 4 : 0) + lane % 4, sus: sus});
 			}
@@ -297,11 +263,8 @@ class ChartEditorState extends FlxState {
 		if (must.length == 0)
 			must.push(true);
 	}
-
 	function stepMs():Float
 		return 60000 / bpm / 4;
-
-	/** altura de um step = lado da celula (a grade e quadrada). */
 	function stepH():Float
 		return cw;
 
@@ -310,25 +273,21 @@ class ChartEditorState extends FlxState {
 
 	function curStep():Float
 		return curT / stepMs();
-
 	function yOfStep(s:Float):Float
 		return PH + (s - curStep()) * stepH();
 
 	function stepOfY(y:Float):Float
 		return curStep() + (y - PH) / stepH();
 
-	/** arredonda pro snap mais proximo (usado em colar / sustain). */
 	function snapRound(v:Float):Float {
 		var ss = snapStep();
 		return Math.round(v / ss) * ss;
 	}
 
-	/** arredonda pra baixo (pro topo da celula tocada). */
 	function snapFloor(v:Float):Float {
 		var ss = snapStep();
 		return Math.floor(v / ss + 0.0001) * ss;
 	}
-
 	function onSnap(s:Float):Bool {
 		var r = s / snapStep();
 		return Math.abs(r - Math.round(r)) < 0.001;
@@ -336,7 +295,6 @@ class ChartEditorState extends FlxState {
 
 	function mustAt(sec:Int):Bool
 		return sec < must.length ? must[sec] : must[must.length - 1];
-
 	function ensureSection(i:Int):Void {
 		while (must.length <= i)
 			must.push(must[must.length - 1]);
@@ -345,7 +303,6 @@ class ChartEditorState extends FlxState {
 	function curSection():Int
 		return Std.int(Math.max(0, Math.floor(curStep() / STEPS)));
 
-	// ------------------------------------------------------------------ zoom / layout da grade
 	function applyZoom():Void {
 		cw = CELL * ZOOMS[zoomIdx];
 		gx = CX - 4 * cw;
@@ -366,8 +323,6 @@ class ChartEditorState extends FlxState {
 		playLine.setPosition(gx - CAMW, PH - 1);
 		needRedraw = true;
 	}
-
-	// ------------------------------------------------------------------ pools
 	function mkPool():EdPool {
 		var g = new FlxTypedGroup<FlxSprite>();
 		add(g);
@@ -394,12 +349,10 @@ class ChartEditorState extends FlxState {
 		s.updateHitbox();
 		s.setPosition(x, y);
 	}
-
 	function poolEnd(p:EdPool):Void {
 		for (i in p.n...p.arr.length)
 			p.arr[i].visible = false;
 	}
-
 	function getCamText():FlxText {
 		var t:FlxText;
 		if (camTextN >= camTexts.length) {
@@ -435,8 +388,6 @@ class ChartEditorState extends FlxState {
 		h.visible = true;
 		return h;
 	}
-
-	// ------------------------------------------------------------------ desenho
 	function redraw():Void {
 		needRedraw = false;
 		var sh = stepH();
@@ -444,8 +395,6 @@ class ChartEditorState extends FlxState {
 		var topStep = cs - (PH - GY0) / sh;
 		var botStep = cs + (GY0 + GH - PH) / sh;
 		var gw = 8 * cw;
-
-		// fundo alternando por beat (4 steps = 4 quadrados)
 		poolBegin(bgPool);
 		var b0 = Math.floor(topStep / 4);
 		var b1 = Math.ceil(botStep / 4);
@@ -454,8 +403,6 @@ class ChartEditorState extends FlxState {
 			poolRect(bgPool, gx, yOfStep(b * 4), gw, 4 * sh, col);
 		}
 		poolEnd(bgPool);
-
-		// linhas: colunas, steps (cada quadrado), beats, secoes e subdivisoes do snap
 		poolBegin(linePool);
 		for (i in 0...9) {
 			if (i == 4)
@@ -485,13 +432,11 @@ class ChartEditorState extends FlxState {
 				if (st < 0)
 					continue;
 				if (ss < 1 && Math.abs(st - Math.round(st)) < 0.001)
-					continue; // ja tem a linha do step
+					continue;
 				poolRect(linePool, gx, yOfStep(st), gw, 1, ss < 1 ? 0xFF22252F : 0xFF5A6078);
 			}
 		}
 		poolEnd(linePool);
-
-		// foco da camera por secao
 		poolBegin(camPool);
 		camTextN = 0;
 		var sc0 = Std.int(Math.max(0, Math.floor(topStep / STEPS)));
@@ -510,8 +455,6 @@ class ChartEditorState extends FlxState {
 		poolEnd(camPool);
 		for (i in camTextN...camTexts.length)
 			camTexts[i].visible = false;
-
-		// notas: cada uma ocupa a celula logo abaixo da linha do seu step (o mesmo lugar do receptor quando passa pelo playhead)
 		poolBegin(ringPool);
 		poolBegin(susPool);
 		for (i in 0...8)
@@ -544,16 +487,12 @@ class ChartEditorState extends FlxState {
 		for (l in 0...8)
 			for (i in headN[l]...heads[l].length)
 				heads[l][i].visible = false;
-
-		// marcador de posicao na barra de busca
 		var topT = topStep * stepMs();
 		var spanT = (GH / sh) * stepMs();
 		viewMark.setGraphicSize(SEEK_W - 2, Math.max(4, spanT / songLenMs * GH));
 		viewMark.updateHitbox();
 		viewMark.setPosition(SEEK_X + 1, GY0 + Math.max(0, Math.min(1, topT / songLenMs)) * GH);
 	}
-
-	/** Recalcula o tamanho da musica e redesenha o minimapa (barra da direita). */
 	function rebuildMap():Void {
 		mapDirty = false;
 		var lastMs = 0.0;
@@ -571,7 +510,6 @@ class ChartEditorState extends FlxState {
 		mini.dirty = true;
 	}
 
-	// ------------------------------------------------------------------ UI
 	function mk(x:Float, y:Float, w:Float, h:Float, text:String, cb:Void->Void, st:Int = 0, size:Int = 15, tab:Int = -1):EdBtn {
 		var s = new FlxSprite().makeGraphic(1, 1, 0xFFFFFFFF);
 		s.setGraphicSize(w, h);
@@ -601,8 +539,6 @@ class ChartEditorState extends FlxState {
 		btns.push(b);
 		return b;
 	}
-
-	/** define quando o botao esta habilitado (desabilitado = apagado e sem resposta ao toque). */
 	function enableWhen(b:EdBtn, f:Void->Bool):EdBtn {
 		b.en = f;
 		return b;
@@ -618,7 +554,6 @@ class ChartEditorState extends FlxState {
 		add(s);
 		return s;
 	}
-
 	function label(x:Float, y:Float, w:Float, size:Int, color:Int, align:FlxTextAlign, tab:Int = -1):FlxText {
 		var t = new FlxText(x, y, w, "", size);
 		t.setFormat(Paths.font("ui.ttf"), size, color, align);
@@ -628,21 +563,16 @@ class ChartEditorState extends FlxState {
 			tabTexts.push({t: t, tab: tab});
 		return t;
 	}
-
 	function charIcon(id:Dynamic):String {
 		var cj:Dynamic = id != null ? Paths.json('data/characters/' + Std.string(id) + '.json') : null;
 		return (cj != null && cj.icon != null) ? Std.string(cj.icon) : "face";
 	}
-
 	function buildUi():Void {
-		// coberturas (escondem o que sai da area da grade) + paineis laterais
 		panel(0, 0, FlxG.width, GY0, C_BG);
 		panel(0, GY0 - 1, FlxG.width, 1, 0xFF22242C);
 		panel(0, GY0 + GH, FlxG.width, FlxG.height - GY0 - GH, C_BG);
 		panel(0, GY0, LX + LW + 16, GH, C_PANEL);
 		panel(RX - 8, GY0, RW + 16, GH, C_PANEL);
-
-		// ---- topo: voltar, titulo, icones das colunas, testar / salvar
 		mk(12, 8, 40, 40, "←", leave, 0, 20);
 		titleTxt = label(64, 8, 300, 16, C_TEXT, FlxTextAlign.LEFT);
 		modTxt = label(64, 30, 300, 11, C_MUTED, FlxTextAlign.LEFT);
@@ -663,7 +593,6 @@ class ChartEditorState extends FlxState {
 			save();
 		}, 1, 15);
 
-		// ---- painel esquerdo: transporte, ferramentas, grade, edicao
 		playBtn = mk(LX, 68, LW, 48, "Reproduzir", togglePlay, 1, 18);
 		timeTxt = label(LX, 124, LW, 22, C_TEXT, FlxTextAlign.LEFT);
 		infoTxt = label(LX, 152, LW, 12, C_MUTED, FlxTextAlign.LEFT);
@@ -678,7 +607,6 @@ class ChartEditorState extends FlxState {
 			var ti = i;
 			toolBtns.push(mk(LX + i * (third + 8), 264, third, 36, tn[i], function() setTool(ti), 3));
 		}
-
 		label(LX, 316, LW, 11, C_MUTED, FlxTextAlign.LEFT).text = "GRADE";
 		mk(LX, 334, 48, 36, "‹", function() changeQuant(-1));
 		snapBtn = mk(LX + 56, 334, LW - 112, 36, "", function() changeQuant(1));
@@ -709,20 +637,18 @@ class ChartEditorState extends FlxState {
 		}
 		label(LX, 590, LW, 12, C_MUTED, FlxTextAlign.LEFT).text = "Toque: põe/tira nota\nArraste a nota para baixo: sustain\nArraste no vazio: rolar a grade\nToque na faixa à esquerda: foco da câmera";
 
-		// ---- painel direito: abas
 		var tw = (RW - 16) / 3;
 		var tabNames = ["Seção", "Áudio", "Música"];
 		for (i in 0...3) {
 			var ti = i;
 			tabBtns.push(mk(RX + i * (tw + 8), 68, tw, 36, tabNames[i], function() setRightTab(ti), 3));
 		}
-		// aba 0: secao
 		focusBtn = mk(RX, 120, RW, 44, "", toggleFocusHere, 0, 15, 0);
 		enableWhen(mk(RX, 172, RW, 40, "Copiar da seção anterior", copyPrev, 0, 15, 0), function() return curSection() > 0);
 		mk(RX, 220, RW, 40, "Selecionar seção", selectSection, 0, 15, 0);
 		mk(RX, 268, RW, 40, "Limpar seção", clearSection, 2, 15, 0);
 		label(RX, 326, RW, 12, C_MUTED, FlxTextAlign.LEFT, 0).text = "A faixa colorida à esquerda da grade mostra para quem a câmera aponta em cada seção (azul = jogador, rosa = oponente). As notas não mudam de lado.";
-		// aba 1: audio
+
 		metroBtn = mk(RX, 120, RW, 40, "", function() {
 			metroOn = !metroOn;
 		}, 4, 15, 1);
@@ -737,7 +663,7 @@ class ChartEditorState extends FlxState {
 			instOn = !instOn;
 			applyVolumes();
 		}, 4, 15, 1);
-		// aba 2: musica
+
 		label(RX, 120, RW, 11, C_MUTED, FlxTextAlign.LEFT, 2).text = "BPM";
 		bpmTxt = label(RX, 138, RW, 26, C_TEXT, FlxTextAlign.LEFT, 2);
 		var q4 = (RW - 24) / 4;
@@ -754,14 +680,12 @@ class ChartEditorState extends FlxState {
 		mk(RX + h2 + 8, 292, h2, 36, "+", function() changeSpeed(0.1), 0, 17, 2);
 		setRightTab(rightTab);
 
-		// ---- barra de busca (minimapa)
 		mini = new FlxSprite(SEEK_X, GY0).makeGraphic(SEEK_W, GH, C_PANEL, true);
 		add(mini);
 		viewMark = new FlxSprite(SEEK_X, GY0).makeGraphic(1, 1, 0xFFFFFFFF);
 		viewMark.alpha = 0.3;
 		add(viewMark);
 
-		// ---- rodape
 		statusTxt = label(16, GY0 + GH + 4, 1248, 12, C_MUTED, FlxTextAlign.LEFT);
 	}
 
@@ -790,7 +714,6 @@ class ChartEditorState extends FlxState {
 		var d = Math.floor(ms / 100) % 10;
 		return m + ":" + (s < 10 ? "0" : "") + s + "." + d;
 	}
-
 	function shortName(s:String, max:Int):String
 		return s.length > max ? s.substr(0, max - 1) + "…" : s;
 
@@ -863,29 +786,24 @@ class ChartEditorState extends FlxState {
 		mapDirty = true;
 		needRedraw = true;
 	}
-
-	// ------------------------------------------------------------------ desfazer / refazer
 	function snapshot():EdSnap {
 		var c:Array<EdNote> = [];
 		for (n in notes)
 			c.push({step: n.step, lane: n.lane, sus: n.sus});
 		return {notes: c, must: must.copy()};
 	}
-
 	function pushUndo():Void {
 		undoS.push(snapshot());
 		if (undoS.length > 100)
 			undoS.shift();
 		redoS = [];
 	}
-
 	function restore(s:EdSnap):Void {
 		notes = s.notes;
 		must = s.must;
 		sel = [];
 		markDirty();
 	}
-
 	function undo():Void {
 		if (undoS.length == 0) {
 			setStatus("Nada pra desfazer.");
@@ -905,13 +823,10 @@ class ChartEditorState extends FlxState {
 		restore(redoS.pop());
 		setStatus("Refeito.");
 	}
-
-	// ------------------------------------------------------------------ navegacao
 	function setTime(t:Float):Void {
 		curT = Math.max(0, Math.min(songLenMs, t));
 		needRedraw = true;
 	}
-
 	function navTo(step:Float):Void {
 		var was = playing;
 		if (was)
@@ -921,7 +836,6 @@ class ChartEditorState extends FlxState {
 		if (was)
 			startPlay();
 	}
-
 	function navSection(d:Int):Void {
 		var cs = curStep() / STEPS;
 		var target = d > 0 ? Math.floor(cs + 0.001) + 1 : Math.ceil(cs - 0.001) - 1;
@@ -942,17 +856,13 @@ class ChartEditorState extends FlxState {
 		zoomIdx = Std.int(Math.max(0, Math.min(ZOOMS.length - 1, i)));
 		applyZoom();
 	}
-
 	function changeZoom(d:Int):Void
 		setZoom(zoomIdx + d);
-
 	function applyVolumes():Void {
 		inst.volume = instOn ? 1 : 0;
 		if (voices != null)
 			voices.volume = voicesOn ? 1 : 0;
 	}
-
-	// ------------------------------------------------------------------ edicao
 	function changeBpm(d:Float):Void {
 		if (playing)
 			stopPlay();
@@ -969,7 +879,6 @@ class ChartEditorState extends FlxState {
 		dirty = true;
 		exitArmed = false;
 	}
-
 	function toggleFocusHere():Void {
 		toggleFocus(curSection());
 	}
@@ -981,7 +890,6 @@ class ChartEditorState extends FlxState {
 		markDirty();
 		setStatus("Câmera da seção " + (sec + 1) + ": " + (must[sec] ? "jogador" : "oponente") + " (as notas não mudam de lado).");
 	}
-
 	function inSection(n:EdNote, sec:Int):Bool
 		return n.step >= sec * STEPS - 0.01 && n.step < (sec + 1) * STEPS - 0.01;
 
@@ -1022,10 +930,6 @@ class ChartEditorState extends FlxState {
 		setStatus("Copiado da seção anterior.");
 	}
 
-	/**
-	 * Nota que esta na celula tocada (rawStep = posicao tocada em steps) na coluna `lane`.
-	 * Notas alinhadas ao snap casam pelo topo da celula; notas fora do snap (charts importados) casam por conter o ponto.
-	 */
 	function noteAtTap(lane:Int, rawStep:Float):EdNote {
 		var target = snapFloor(rawStep);
 		var best:EdNote = null;
@@ -1044,7 +948,6 @@ class ChartEditorState extends FlxState {
 			}
 		return best;
 	}
-
 	function toggleNoteAt(lane:Int, rawStep:Float):Void {
 		var ex = noteAtTap(lane, rawStep);
 		pushUndo();
@@ -1066,7 +969,6 @@ class ChartEditorState extends FlxState {
 
 	function placeAtPlayhead(lane:Int):Void
 		toggleNoteAt(lane, snapRound(curStep()));
-
 	function selectSection():Void {
 		var sec = curSection();
 		sel = [];
@@ -1090,7 +992,6 @@ class ChartEditorState extends FlxState {
 			clip.push({d: n.step - m, lane: n.lane, sus: n.sus});
 		setStatus(clip.length + " notas copiadas. Role até o destino e toque em Colar.");
 	}
-
 	function pasteSel():Void {
 		if (clip.length == 0) {
 			setStatus("Área de cópia vazia.");
@@ -1139,7 +1040,6 @@ class ChartEditorState extends FlxState {
 		markDirty();
 	}
 
-	// ------------------------------------------------------------------ ponteiro
 	function readPointer():Void {
 		pJust = false;
 		pUp = false;
@@ -1191,18 +1091,15 @@ class ChartEditorState extends FlxState {
 			activeId = -99;
 		}
 	}
-
 	function inGrid(x:Float, y:Float):Bool
 		return x >= gx - CAMW && x < gx + 8 * cw && y >= GY0 && y < GY0 + GH;
 
 	function btnHit(b:EdBtn, x:Float, y:Float):Bool
 		return b.on && (b.en == null || b.en()) && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
-
 	function seekTo(y:Float):Void {
 		setTime((y - GY0) / GH * songLenMs);
 		scrollVel = 0;
 	}
-
 	function handlePointer(elapsed:Float):Void {
 		readPointer();
 		if (pJust) {
@@ -1250,7 +1147,6 @@ class ChartEditorState extends FlxState {
 		} else if (gKind == 3)
 			gridGesture(elapsed);
 	}
-
 	function gridGesture(elapsed:Float):Void {
 		var dx = px - gSX;
 		var dy = py - gSY;
@@ -1272,7 +1168,7 @@ class ChartEditorState extends FlxState {
 			if (elapsed > 0)
 				scrollVel = scrollVel * 0.6 + 0.4 * ((curT - old) / elapsed);
 		} else if (gMode == 2) {
-			// o sustain termina no centro da celula onde o dedo esta
+
 			var len = stepOfY(py) - 0.5 - gNote.step;
 			gNote.sus = len < snapStep() * 0.5 ? 0 : Math.max(snapStep(), snapRound(len));
 			needRedraw = true;
@@ -1302,7 +1198,6 @@ class ChartEditorState extends FlxState {
 			}
 		}
 	}
-
 	function applyBox(x0:Float, y0:Float, x1:Float, y1:Float):Void {
 		sel = [];
 		for (n in notes) {
@@ -1314,7 +1209,6 @@ class ChartEditorState extends FlxState {
 		needRedraw = true;
 		setStatus(sel.length + " notas selecionadas.");
 	}
-
 	function tapGrid(x:Float, y:Float):Void {
 		var rawStep = stepOfY(y);
 		if (x < gx) {
@@ -1336,15 +1230,12 @@ class ChartEditorState extends FlxState {
 			needRedraw = true;
 		}
 	}
-
-	// ------------------------------------------------------------------ audio
 	function togglePlay():Void {
 		if (playing)
 			stopPlay();
 		else
 			startPlay();
 	}
-
 	function startPlay():Void {
 		if (curT >= songLenMs - 100) {
 			setStatus("Fim da música: volte ao início ou role pra trás.");
@@ -1394,7 +1285,6 @@ class ChartEditorState extends FlxState {
 			stopPlay();
 	}
 
-	// ------------------------------------------------------------------ salvar / testar / sair
 	function save():Bool {
 		#if sys
 		var mod = Paths.currentMod();
@@ -1426,7 +1316,7 @@ class ChartEditorState extends FlxState {
 				var sus = n.sus > 0 ? Math.round(n.sus * sm * 100) / 100 : 0;
 				var isPlayer = n.lane >= 4;
 				var d = n.lane % 4;
-				var fileLane = (isPlayer == must[si]) ? d : d + 4; // inverso do que o PlayState faz
+				var fileLane = (isPlayer == must[si]) ? d : d + 4;
 				sns[si].push([t, fileLane, sus]);
 			}
 			for (e in extras)
@@ -1461,7 +1351,6 @@ class ChartEditorState extends FlxState {
 	}
 
 	#if sys
-	/** Garante que a musica aparece no Freeplay: acrescenta no songlist.json do mod (copiando o atual se o mod ainda nao tem um). */
 	function addToSongList(mod:String):Void {
 		var list:Array<Dynamic> = Paths.json("data/songlist.json");
 		if (list == null)
@@ -1488,7 +1377,6 @@ class ChartEditorState extends FlxState {
 		PlayState.songId = songId;
 		TransitionSubState.go(new PlayState());
 	}
-
 	function leave():Void {
 		if (dirty && !exitArmed) {
 			exitArmed = true;
@@ -1501,7 +1389,6 @@ class ChartEditorState extends FlxState {
 		TransitionSubState.go(new ChartPickState());
 	}
 
-	// ------------------------------------------------------------------ loop
 	function handleKeys():Void {
 		var k = FlxG.keys;
 		if (k.justPressed.SPACE)
@@ -1562,7 +1449,6 @@ class ChartEditorState extends FlxState {
 		if (playing)
 			updatePlayback();
 		else if (!(gKind == 3 && gMode == 1) && Math.abs(scrollVel) > 30) {
-			// inercia depois de soltar o dedo
 			setTime(curT + scrollVel * elapsed);
 			scrollVel *= Math.exp(-5 * elapsed);
 			if (curT <= 0 || curT >= songLenMs)

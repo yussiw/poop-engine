@@ -3,8 +3,6 @@ package states;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
-
-/** Placeholder pras telas que ainda nao existem (Story Mode / Credits). */
 class ComingSoonState extends FlxState {
 	override function create():Void {
 		super.create();
@@ -14,7 +12,6 @@ class ComingSoonState extends FlxState {
 		t.screenCenter();
 		add(t);
 	}
-
 	override function update(elapsed:Float):Void {
 		Controls.update();
 		super.update(elapsed);

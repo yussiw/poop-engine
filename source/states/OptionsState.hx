@@ -1,5 +1,4 @@
 package states;
-
 import Options.OptionDef;
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -8,16 +7,6 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 
-/**
- * Opcoes em categorias (igual a Codename): primeiro a lista de categorias, depois as opcoes da categoria.
- * Deslizar cima/baixo escolhe, toque no item selecionado abre/muda o valor, deslizar pra direita (ou voltar)
- * sobe um nivel. Tudo e salvo na hora (ver Options.hx). Os textos vem do Lang (idioma escolhido).
- *
- * Opcoes "bool" mostram o nome + a caixinha (assets/images/menus/options/checkbox); "int"/"choice" mostram "nome: valor";
- * "action" so o nome (toque executa). Categorias com painel (Options.infoPanels, ex.: "updates") mostram um texto fixo em cima.
- *
- * Mods: data/states/options.hx pode registrar opcoes/categorias novas (Options.register) em onCreate.
- */
 class OptionsState extends FlxState {
 	var grp:FlxTypedGroup<Alphabet>;
 	var checks:FlxTypedGroup<Checkbox>;
@@ -43,12 +32,10 @@ class OptionsState extends FlxState {
 		scripts.call("onCreate");
 		if (FlxG.sound.music == null || !FlxG.sound.music.playing)
 			FlxG.sound.playMusic(Paths.music("freakyMenu"), 0.7);
-
 		var bg = new FlxSprite(0, 0, Paths.image("menus/menuDesat"));
 		bg.color = 0xFFEA71FD;
 		bg.antialiasing = Options.antialiasing;
 		add(bg);
-
 		grp = new FlxTypedGroup<Alphabet>();
 		add(grp);
 		checks = new FlxTypedGroup<Checkbox>();
@@ -65,27 +52,20 @@ class OptionsState extends FlxState {
 		title = new FlxText(10, 8, FlxG.width - 20, "", 28);
 		title.setFormat(Paths.font("vcr.ttf"), 28, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(title);
-
 		hint = new FlxText(10, FlxG.height - 30, FlxG.width - 20, "", 18);
 		hint.setFormat(Paths.font("vcr.ttf"), 18, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(hint);
-
 		desc = new FlxText(10, FlxG.height - 62, FlxG.width - 20, "", 20);
 		desc.setFormat(Paths.font("vcr.ttf"), 20, 0xFFFFFF99, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(desc);
-
 		build(true);
 		scripts.call("onCreatePost");
 	}
-
-	// ------------------------------------------------------------------ montagem
 	function catName(c:String):String
 		return Lang.get("cat." + c, c);
 
 	function optionName(d:OptionDef):String
 		return Lang.get("opt." + d.id, d.name != null ? Lang.get(d.name) : d.id);
-
-	/** bool = so o nome (a caixinha mostra o valor); action = so o nome; o resto = "nome: valor". */
 	function optionLabel(d:OptionDef):String {
 		if (d.type == "bool" || d.type == "action")
 			return optionName(d);
@@ -123,7 +103,7 @@ class OptionsState extends FlxState {
 			a.isMenuItem = panelFn == null;
 			a.targetY = i;
 			if (panelFn != null) {
-				// categoria com painel: itens fixos embaixo do texto (sem a rolagem)
+
 				a.x = 90;
 				a.y = 430 + i * 100;
 			}
@@ -140,8 +120,6 @@ class OptionsState extends FlxState {
 		if (panelFn != null)
 			refreshPanel();
 	}
-
-	/** Opcao bool = caixinha ao lado do texto. */
 	function addCheck(i:Int, a:Alphabet):Void {
 		if (!inCategory)
 			return;
@@ -164,7 +142,6 @@ class OptionsState extends FlxState {
 	function label(i:Int):String
 		return inCategory ? optionLabel(Options.find(entries[i])) : catName(entries[i]);
 
-	/** O Alphabet nao troca de texto: recria o item na mesma posicao. */
 	function refresh(i:Int):Void {
 		var old = grp.members[i];
 		var a = new Alphabet(old.x, old.y, label(i));
@@ -178,7 +155,6 @@ class OptionsState extends FlxState {
 		if (c != null)
 			c.sprTracker = a;
 	}
-
 	function change(c:Int):Void {
 		if (entries.length == 0)
 			return;
@@ -210,7 +186,7 @@ class OptionsState extends FlxState {
 			FlxG.sound.play(Paths.sfx("menu/scroll"), 0.6);
 			build(true);
 			if (category == "updates")
-				Updates.onOpen(); // checa o GitHub sozinho (uma vez por sessao)
+				Updates.onOpen();
 			return;
 		}
 		var d = Options.find(entries[i]);
@@ -227,12 +203,12 @@ class OptionsState extends FlxState {
 		Options.cycle(d);
 		scripts.call("onOptionChanged", [d.id, Options.get(d.id)]);
 		if (d.id == "language") {
-			build(); // todos os textos mudam de idioma
+			build();
 			return;
 		}
 		var c = checkOf.get(i);
 		if (c != null) {
-			c.setChecked(Options.get(d.id) == true); // bool: so a caixinha muda (o texto e o mesmo)
+			c.setChecked(Options.get(d.id) == true);
 			return;
 		}
 		refresh(i);

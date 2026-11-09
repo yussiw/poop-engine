@@ -1,6 +1,5 @@
 #pragma header
 
-// strength: 0 = sem efeito, 1 = bordas bem escuras. Pensado pra uma camera inteira (setCamera).
 uniform float strength;
 
 void main() {

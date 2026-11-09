@@ -1,6 +1,5 @@
 #pragma header
 
-// offset: distancia do deslocamento de cor (ex.: 0.004). Pensado pra uma camera inteira (setCamera).
 uniform float offset;
 
 void main() {

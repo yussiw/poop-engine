@@ -1,5 +1,4 @@
 package states;
-
 import flixel.FlxG;
 import flixel.FlxObject;
 import flixel.FlxSprite;
@@ -11,23 +10,8 @@ import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 import flixel.util.FlxColor;
 
-/**
- * Menu principal no estilo da Codename Engine (funkin/menus/MainMenuState.hx):
- * - fundo menuBG com scrollFactor Y 0.18 e escala 1.15; magenta = menuDesat tingido de 0xFFFD719B
- * - itens em y = 60 + i * 160, centralizados em X; o frame "selected" cresce a partir do topo (updateHitbox + centerOffsets)
- * - camera segue o item selecionado com lerp 0.06 (so o fundo se mexe de verdade)
- * - texto de versao no canto inferior esquerdo; tocar nele abre a selecao de mod (igual o clique na Codename)
- * Navegacao: swipe cima/baixo, toque no item selecionado confirma.
- */
 class MainMenuState extends FlxState {
 	static var lastCur:Int = 0;
-
-	/**
-	 * Itens do menu. Scripts (data/states/menu.hx) podem mudar a lista em onCreate:
-	 *   menuItems.push({id: "meu", file: "menu_meu", idle: "meu idle", selected: "meu selected", action: "options"});
-	 * file = atlas em images/menus/mainmenu/<file>.xml; action = nome de state ("freeplay", "options", "mods", "editor",
-	 * "credits", "menu"...) ou uma funcao do script. Sem action, usa o id.
-	 */
 	public var menuItems:Array<MenuItemDef> = [
 		{id: "story", file: "menu_story_mode", idle: "story_mode idle", selected: "story_mode selected", action: "credits"},
 		{id: "freeplay", file: "freeplay", idle: "freeplay basic", selected: "freeplay white", action: "freeplay"},
@@ -48,9 +32,8 @@ class MainMenuState extends FlxState {
 	var logBG:FlxSprite;
 	var logTxt:FlxText;
 
-	/** quanto os itens acompanham a camera no eixo Y (0 = parados, igual a Codename; o fundo usa 0.18). */
 	static inline var ITEM_SCROLL:Float = 0.06;
-	static inline var LOG_TIME:Float = 3; // segundos que o log fica visivel antes do fade
+	static inline var LOG_TIME:Float = 3;
 	static inline var LOG_FADE:Float = 0.6;
 
 	override function create():Void {
@@ -102,13 +85,10 @@ class MainMenuState extends FlxState {
 		versionTxt.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		versionTxt.y = FlxG.height - versionTxt.height - 4;
 		add(versionTxt);
-
 		var edTxt = new FlxText(10, 6, 0, Lang.get("menu.editor"), 18);
 		edTxt.scrollFactor.set();
 		edTxt.setFormat(Paths.font("vcr.ttf"), 18, 0xFF99FFBB, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(edTxt);
-
-		// log temporario (mod, avisos, diagnostico): aparece ao abrir o menu, fica LOG_TIME segundos e some com fade
 		logBG = new FlxSprite(FlxG.width - 576, 4);
 		logBG.scrollFactor.set();
 		add(logBG);
@@ -121,12 +101,10 @@ class MainMenuState extends FlxState {
 			showLog();
 		else
 			logTxt.alpha = logBG.alpha = 0;
-
 		changeItem(0);
 		scripts.call("onCreatePost");
 	}
 
-	/** Monta o texto do log. Nao reinicia o fade (so showLog faz isso). */
 	function buildLog():Void {
 		var mods = Paths.listMods();
 		var cm = Paths.currentMod();
@@ -140,8 +118,6 @@ class MainMenuState extends FlxState {
 		logTxt.text = t;
 		logBG.makeGraphic(Std.int(logTxt.fieldWidth) + 16, Std.int(logTxt.height) + 12, FlxColor.BLACK);
 	}
-
-	/** Mostra o log por LOG_TIME segundos e depois some com fade. */
 	function showLog():Void {
 		FlxTween.cancelTweensOf(logTxt);
 		FlxTween.cancelTweensOf(logBG);
@@ -169,16 +145,14 @@ class MainMenuState extends FlxState {
 			spr.centerOffsets();
 		});
 	}
-
 	function accept():Void {
 		if (selected)
 			return;
-		// onSelect(indice, id) + cancelEvent() = o script cuida da acao (nenhuma animacao padrao)
 		if (scripts.call("onSelect", [cur, menuItems[cur].id]))
 			return;
 		var act:Dynamic = menuItems[cur].action;
 		if (act != null && Reflect.isFunction(act)) {
-			act(); // acao em funcao (do script): ela decide o que acontece
+			act();
 			return;
 		}
 		selected = true;
@@ -193,7 +167,6 @@ class MainMenuState extends FlxState {
 		});
 		FlxFlicker.flicker(items.members[cur], 1, Options.flashing ? 0.06 : 0.15, false, false, function(_) go());
 	}
-
 	function go():Void {
 		var it = menuItems[cur];
 		Script.switchState(it.action != null ? it.action : it.id);
@@ -203,7 +176,7 @@ class MainMenuState extends FlxState {
 		Controls.update();
 		super.update(elapsed);
 		scripts.call("onUpdate", [elapsed]);
-		// o frame "selected" e mais largo: mantem sempre centralizado em X
+
 		items.forEach(function(s:FlxSprite) s.screenCenter(X));
 		if (selected)
 			return;
@@ -218,7 +191,7 @@ class MainMenuState extends FlxState {
 				buildLog();
 			}
 		}
-		// canto superior direito: pede a permissao de novo (se faltar) e mostra o log
+
 		if (Controls.tap && Controls.tapX > FlxG.width * 0.5 && Controls.tapY < 80) {
 			if (!Paths.externalReady)
 				Paths.requestAgain();
@@ -226,7 +199,6 @@ class MainMenuState extends FlxState {
 			showLog();
 			return;
 		}
-		// tocar no texto de versao abre a selecao de mod (igual a Codename)
 		if (Controls.tap && Controls.tapX >= versionTxt.x && Controls.tapX <= versionTxt.x + versionTxt.width + 20 && Controls.tapY >= versionTxt.y - 10) {
 			TransitionSubState.go(new ModSelectState());
 			return;
@@ -252,7 +224,7 @@ class MainMenuState extends FlxState {
 			changeItem(-1);
 		if (Controls.tap) {
 			for (s in items.members) {
-				var sy = s.y - FlxG.camera.scroll.y * s.scrollFactor.y; // posicao real na tela (os itens acompanham a camera de leve)
+				var sy = s.y - FlxG.camera.scroll.y * s.scrollFactor.y;
 				if (Controls.tapX > s.x && Controls.tapX < s.x + s.width && Controls.tapY > sy && Controls.tapY < sy + s.height) {
 					if (s.ID == cur)
 						accept();

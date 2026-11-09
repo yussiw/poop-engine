@@ -3,14 +3,11 @@ package;
 import flixel.FlxSprite;
 import flixel.util.FlxColor;
 import haxe.Json;
-
 using StringTools;
 
-/** Personagem totalmente definido por assets/data/characters/<id>.json */
 @:keep
 class Character extends FlxSprite {
 	public static final SING:Array<String> = ["singLEFT", "singDOWN", "singUP", "singRIGHT"];
-
 	public var id:String;
 	public var isPlayer:Bool;
 	public var holdTimer:Float = 0;
@@ -29,7 +26,6 @@ class Character extends FlxSprite {
 		var d:Dynamic = Paths.json('data/characters/$id.json');
 		if (d == null)
 			d = Paths.json('data/characters/bf.json');
-
 		frames = Paths.sparrow(d.image);
 		antialiasing = Options.antialiasing;
 		if (d.scale != null) {
@@ -64,7 +60,6 @@ class Character extends FlxSprite {
 		}
 		dance();
 	}
-
 	public function playAnim(name:String, force:Bool = true):Void {
 		if (!animation.exists(name))
 			return;

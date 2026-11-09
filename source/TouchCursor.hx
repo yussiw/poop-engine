@@ -1,5 +1,4 @@
 package;
-
 import flixel.FlxCamera;
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -10,18 +9,9 @@ import flixel.util.FlxSpriteUtil;
 import states.ChartEditorState;
 import states.PlayState;
 
-/**
- * Cursor de toque so pros menus (opcao "cursor" em OptionsState): mostra um anel no dedo, uma linha desde onde o
- * toque comecou e o nome do gesto (TOQUE / CIMA / BAIXO / ESQUERDA / DIREITA, com o mesmo limite do Controls).
- * Nao aparece no PlayState nem no ChartEditorState. Desenha numa camera propria, entao fica por cima de tudo da tela.
- *
- * Main chama TouchCursor.init() uma vez; a cada troca de state ele se anexa sozinho ao state novo.
- */
 class TouchCursor extends FlxGroup {
-	static inline var HOLD:Float = 0.7; // segundos que o gesto continua na tela depois de soltar (com fade)
-
+	static inline var HOLD:Float = 0.7;
 	static var hooked:Bool = false;
-
 	public static function init():Void {
 		if (hooked)
 			return;
@@ -59,7 +49,6 @@ class TouchCursor extends FlxGroup {
 		cam.bgColor = FlxColor.TRANSPARENT;
 		FlxG.cameras.add(cam, false);
 
-		// linha: 1 x 6 px esticada em X e girada em volta da ponta esquerda
 		trail = new FlxSprite().makeGraphic(1, 6, FlxColor.WHITE);
 		trail.origin.set(0, 3);
 		trail.alpha = 0.6;
@@ -98,7 +87,6 @@ class TouchCursor extends FlxGroup {
 			return;
 		}
 
-		// um ponteiro so: o primeiro toque ativo (ou o mouse, no PC, pra testar)
 		var found = false;
 		var px:Float = 0;
 		var py:Float = 0;
@@ -139,7 +127,7 @@ class TouchCursor extends FlxGroup {
 			cy = py;
 			holdT = HOLD;
 			if (jr)
-				down = false; // soltou: o gesto fica na tela por HOLD segundos e some com fade
+				down = false;
 		} else {
 			down = false;
 			holdT = Math.max(0, holdT - elapsed);
@@ -183,7 +171,6 @@ class TouchCursor extends FlxGroup {
 			startDot.alpha = 0.8 * a;
 			startDot.color = tint;
 		}
-
 		label.visible = true;
 		label.text = name;
 		label.alpha = a;

@@ -50,7 +50,7 @@ Cada mod e uma **subpasta** dentro de `mods/`, com a mesma estrutura de `assets/
 Menu principal -> Opcoes -> escolha a categoria (**jogabilidade**, **graficos**, **interface**, **controles**, **idioma**, **atualizacoes**).
 Tudo e registrado em `Options.defs` (`source/Options.hx`): `downscroll`, `ghostTapping`, `splashes`, `camZooming`, `antialiasing`, `lowQuality`, `fps` (30-144),
 `fpsCounter`, `flashing`, `menuLog`, `volume`, `hitbox`, `touchCursor`, `language`, `shaders`. Salvo em `FlxG.save.data.opts` (as chaves antigas sao migradas sozinhas;
-valor salvo com tipo errado, ex.: `true` em `fps`, volta pro padrao em vez de aparecer como "FRAME RATE: TRUE").
+valor salvo com tipo errado, ex.: `true` em `fps`, volta pro padrao em vez de aparecer como "FRAME RATE: TRUE"; o save e corrigido ao abrir o jogo).
 - Opcoes **bool** mostram o nome + a caixinha animada (`assets/images/menus/options/checkbox`); **int/choice** mostram `nome: valor`; **action** so o nome (toque executa `action()`).
 - Scripts e mods leem com `option("id")` / `Options.get("id")` e criam opcoes novas com `Options.register({id, category, type: "bool"|"int"|"choice", def, ...})`
   (veja `example_mods/ScriptExample/data/states/options.hx`).

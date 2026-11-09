@@ -2,13 +2,9 @@ package;
 
 import flixel.FlxSprite;
 
-/**
- * Caixinha de marcar do menu de opcoes (atlas menus/options/checkbox: "Radio unselected", "Radio selecting animation",
- * "Radio Selected Static", "Radio deselect animation"). Fica ao lado do texto da opcao (sprTracker) e acompanha a posicao/alpha dele.
- */
 class Checkbox extends FlxSprite {
 	public static inline var SCALE:Float = 0.6;
-	/** frame de referencia (o "unselected" tem 138x127; os outros frames sao recortes dele) */
+
 	static inline var REF_W:Float = 138;
 
 	public var sprTracker:FlxSprite;
@@ -42,7 +38,6 @@ class Checkbox extends FlxSprite {
 		animation.play(value ? "selected" : "unselected");
 	}
 
-	/** Marca/desmarca (com a animacao de "selecionando"/"desselecionando"). */
 	public function setChecked(v:Bool, animate:Bool = true):Void {
 		if (!ok || v == checked)
 			return;
@@ -57,7 +52,6 @@ class Checkbox extends FlxSprite {
 		super.update(elapsed);
 		if (!ok)
 			return;
-		// os frames tem tamanhos diferentes: centraliza em volta do mesmo ponto a cada quadro
 		centerOrigin();
 		if (sprTracker != null) {
 			var cx = sprTracker.x + sprTracker.width + gap + REF_W * SCALE / 2;

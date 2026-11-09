@@ -12,46 +12,31 @@ import sys.FileSystem;
 import sys.io.File;
 #end
 
-/**
- * Todo acesso a arquivos passa por aqui. Ordem de busca:
- *   1. <pasta externa>/mods/<ModAtivo>/<mesmo caminho de assets/>
- *   2. assets/ (embutido no APK)
- *
- * Pasta externa (mesma ideia do "external" da Codename Engine Mobile):
- *   Android: /storage/emulated/0/.PoopEngine/   (raiz do armazenamento, igual .CodenameEngine / .PsychEngine;
- *            exige a permissao "acesso a todos os arquivos", que o app pede sozinho)
- *   Desktop: pasta do executavel
- * Cada mod e uma subpasta: mods/MeuMod/data/..., mods/MeuMod/songs/..., mods/MeuMod/images/...
- * O mod ativo e escolhido no menu principal (deslizar pra esquerda / TAB) e fica salvo.
- */
 @:keep
 class Paths {
 	static var rootPath:String = null;
 	static var activeMod:String = "";
 	static var frameCache:Map<String, FlxAtlasFrames> = new Map();
-	/** frames (indices) de cada animacao por prefixo ja calculada: evita varrer o atlas inteiro a cada nota criada */
+
 	static var animCache:Map<String, Array<Int>> = new Map();
-	/** lista de arquivos embutidos (Assets.list() cria um array novo a cada chamada) */
+
 	static var assetList:Array<String> = null;
-	/** ids das imagens que carregamos (persist = true), pra poder solta-las ao trocar de mod */
 	static var loadedImages:Map<String, Bool> = new Map();
 
 	public static var externalReady:Bool = false;
 	static var asked:Bool = false;
+	static var purgePending:Bool = false;
+	static var switchHooked:Bool = false;
 	static var diag:String = "";
 
-	/** Texto de diagnostico (mostrado no menu enquanto a pasta externa nao funciona). */
 	public static function diagnostics():String
 		return diag;
-
-	/** Pede as permissoes de novo (usado por um toque no menu). */
 	public static function requestAgain():Void {
 		#if android
 		asked = false;
 		requestStorage();
 		#end
 	}
-
 	#if android
 	static function androidInfo():Void {
 		try {
@@ -61,7 +46,6 @@ class Paths {
 		}
 	}
 	#end
-
 	#if android
 	static function requestStorage():Void {
 		if (asked)
@@ -79,8 +63,6 @@ class Paths {
 		}
 	}
 	#end
-
-	/** Chamado de novo pelo menu enquanto a permissao nao foi concedida; retorna true quando a pasta externa ficou pronta. */
 	public static function retryExternal():Bool {
 		if (externalReady)
 			return false;
@@ -88,7 +70,6 @@ class Paths {
 		return externalReady;
 	}
 
-	/** Chamar no Main, depois do FlxG.save.bind. */
 	public static function init():Void {
 		#if sys
 		diag = "";
@@ -126,7 +107,6 @@ class Paths {
 		}
 	}
 
-	/** Aceita a pasta se der pra criar/abrir e listar. Escrita e so informativa (aparece no diagnostico). */
 	static function probe(dir:String):Bool {
 		var made = mkdirs(dir);
 		var readable = false;
@@ -154,7 +134,7 @@ class Paths {
 		#if android
 		candidates.push("/storage/emulated/0/.PoopEngine/");
 		candidates.push("/sdcard/.PoopEngine/");
-		candidates.push(haxe.io.Path.addTrailingSlash(lime.system.System.applicationStorageDirectory)); // ultimo recurso (privado)
+		candidates.push(haxe.io.Path.addTrailingSlash(lime.system.System.applicationStorageDirectory));
 		#else
 		candidates.push(haxe.io.Path.addTrailingSlash(haxe.io.Path.directory(Sys.programPath())));
 		candidates.push(haxe.io.Path.addTrailingSlash(lime.system.System.applicationStorageDirectory));
@@ -166,7 +146,6 @@ class Paths {
 	}
 	#end
 
-	/** Cria a pasta (e as pais). Usado pelo editor de chart pra salvar dentro do mod. */
 	public static function ensureDir(dir:String):Bool {
 		#if sys
 		return mkdirs(dir);
@@ -175,7 +154,6 @@ class Paths {
 		#end
 	}
 
-	/** Pasta que contem as subpastas de mods (ex.: /storage/emulated/0/.PoopEngine/mods/). */
 	public static function modsDir():String {
 		#if sys
 		return (rootPath == null ? "" : rootPath) + "mods/";
@@ -184,7 +162,6 @@ class Paths {
 		#end
 	}
 
-	/** Nomes das subpastas de mods (ordem alfabetica). */
 	public static function listMods():Array<String> {
 		var out:Array<String> = [];
 		#if sys
@@ -197,39 +174,45 @@ class Paths {
 		#end
 		return out;
 	}
-
-	/** "" = so o jogo base. */
 	public static function currentMod():String
 		return activeMod;
-
-	/** Troca o mod ativo ("" = nenhum), salva e limpa os caches pra o novo mod valer. */
 	public static function setMod(name:String):Void {
 		activeMod = name == null ? "" : name;
 		FlxG.save.data.mod = activeMod;
 		FlxG.save.flush();
 		clearCache();
 	}
-
-	/** Passa pro proximo mod da lista (base -> mod1 -> mod2 -> ... -> base). Retorna o novo nome. */
 	public static function nextMod():String {
 		var all = [""].concat(listMods());
 		var i = all.indexOf(activeMod);
 		setMod(all[(i + 1) % all.length]);
 		return activeMod;
 	}
-
-	/** Re-escaneia a pasta de mods (e tenta de novo a pasta externa). */
 	public static function reload():Void {
 		init();
 		clearCache();
 	}
 
 	public static function clearCache():Void {
+		purgePending = true;
+		hookSwitch();
+	}
+
+	static function hookSwitch():Void {
+		if (switchHooked)
+			return;
+		switchHooked = true;
+		FlxG.signals.preStateSwitch.add(flush);
+	}
+
+	public static function flush():Void {
+		if (!purgePending)
+			return;
+		purgePending = false;
 		frameCache.clear();
 		animCache.clear();
 		Shaders.clear();
-		// as imagens sao persistentes (persist = true), entao clearCache() nao as solta: sem isto, tudo que ja foi
-		// aberto antes de trocar de mod (menu, icones...) continuava com a imagem antiga; so telas novas pegavam a do mod.
+		Alphabet.reset();
 		for (k in loadedImages.keys()) {
 			var g = FlxG.bitmap.get(k);
 			if (g != null) {
@@ -241,7 +224,7 @@ class Paths {
 		loadedImages.clear();
 		FlxG.bitmap.clearCache();
 		if (Lang.loaded)
-			Lang.load(Lang.current); // o mod pode trazer/trocar traducoes
+			Lang.load(Lang.current);
 	}
 
 	static function modPath(key:String):String {
@@ -258,7 +241,6 @@ class Paths {
 	static inline function asset(key:String):String
 		return "assets/" + key;
 
-	/** Arquivos `<dir>/*.<ext>` (so o nivel direto), no mod ativo e no jogo base, sem repetir. Retorna chaves tipo "data/states/menu/a.hx". */
 	public static function list(dir:String, ext:String):Array<String> {
 		var out:Array<String> = [];
 		var prefix = StringTools.endsWith(dir, "/") ? dir : dir + "/";
@@ -287,7 +269,6 @@ class Paths {
 		out.sort(function(a, b) return a < b ? -1 : 1);
 		return out;
 	}
-
 	public static function exists(key:String):Bool
 		return modPath(key) != null || Assets.exists(asset(key));
 
@@ -355,16 +336,12 @@ class Paths {
 		return f;
 	}
 
-	/**
-	 * Igual a spr.animation.addByPrefix(), mas guarda o resultado: a primeira vez varre o atlas, as proximas so copiam
-	 * a lista de frames (mesmos frames, mesma ordem, nenhuma mudanca visual). Retorna false se o prefixo nao existe.
-	 */
 	public static function addAnim(spr:flixel.FlxSprite, name:String, prefix:String, fps:Float = 24, loop:Bool = true):Bool {
 		var key = (spr.frames != null && spr.frames.parent != null ? spr.frames.parent.key : "") + "|" + prefix;
 		var idx = animCache.get(key);
 		if (idx != null) {
 			if (idx.length == 0)
-				return false; // prefixo ja procurado e nao existe nesse atlas
+				return false;
 			spr.animation.add(name, idx, fps, loop);
 			return true;
 		}
@@ -373,7 +350,6 @@ class Paths {
 		animCache.set(key, a == null ? [] : a.frames.copy());
 		return a != null;
 	}
-
 	public static function audio(id:String):Sound {
 		#if sys
 		var m = modPath(id);
@@ -385,7 +361,6 @@ class Paths {
 
 	public static inline function sfx(name:String):Sound
 		return audio("sounds/" + name + ".ogg");
-
 	public static inline function music(name:String):Sound
 		return audio("music/" + name + ".ogg");
 

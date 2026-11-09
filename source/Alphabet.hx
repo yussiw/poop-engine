@@ -1,5 +1,4 @@
 package;
-
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.graphics.frames.FlxAtlasFrames;
@@ -7,22 +6,23 @@ import flixel.graphics.frames.FlxFrame;
 import flixel.group.FlxSpriteGroup;
 import flixel.math.FlxMath;
 
-/** Texto com a fonte bold do FNF (menus/alphabet-bold). Com isMenuItem = true desliza pra posicao de targetY como na vanilla/Kade. */
 class Alphabet extends FlxSpriteGroup {
 	public var targetY:Float = 0;
 	public var isMenuItem:Bool = false;
 
 	static final SYMBOLS:Map<String, String> = [
 		"-" => "hyphen", "." => "period", "," => "comma", "'" => "singlequote", "!" => "exclamationmark", "?" => "questionmark",
-		":" => "colon", "&" => "ampersand", "+" => "plus", "/" => "slash", "_" => "underscore"
+		":" => "colon", "&" => "ampersand", "+" => "plus", "/" => "slash", "_" => "underscore", "%" => "percent"
 	];
 	static final NUMS:Array<String> = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
-
-	/** frames das letras ja procurados (muda so quando o atlas muda, ex.: troca de mod) */
 	static var atlas:FlxAtlasFrames = null;
 	static var glyphs:Map<String, FlxFrame> = new Map();
 
-	/** A fonte bold nao tem acentos: troca por letra sem acento (vira "opcoes" etc.). */
+	public static function reset():Void {
+		atlas = null;
+		glyphs = new Map();
+	}
+
 	public static function plain(t:String):String {
 		var from = "áàâãäéèêëíìîïóòôõöúùûüçñ";
 		var to = "aaaaaeeeeiiiiooooouuuucn";
@@ -34,7 +34,6 @@ class Alphabet extends FlxSpriteGroup {
 		}
 		return out.toString();
 	}
-
 	public function new(x:Float, y:Float, text:String) {
 		super(x, y);
 		text = plain(text);
@@ -62,7 +61,7 @@ class Alphabet extends FlxSpriteGroup {
 				name = SYMBOLS.get(c);
 			if (name == null)
 				continue;
-			// usa o frame da letra direto (mesmo quadro de antes), sem criar um controlador de animacao por letra
+
 			var fr = glyphs.get(name);
 			if (fr == null) {
 				fr = f.getByName("character-" + name + "0000");

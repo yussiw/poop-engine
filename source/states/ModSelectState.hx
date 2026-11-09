@@ -1,16 +1,10 @@
 package states;
-
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
-
-/**
- * Selecao de mod. Lista: (base) + subpastas de mods/. Deslizar cima/baixo troca, toque no item selecionado aplica,
- * deslizar pra direita (ou voltar) cancela. Deslizar pra esquerda recarrega a lista de pastas.
- */
 class ModSelectState extends FlxState {
 	var names:Array<String> = [];
 	var cur:Int = 0;
@@ -22,7 +16,6 @@ class ModSelectState extends FlxState {
 		super.create();
 		if (FlxG.sound.music == null || !FlxG.sound.music.playing)
 			FlxG.sound.playMusic(Paths.music("freakyMenu"), 0.7);
-
 		var bg = new FlxSprite(0, 0, Paths.image("menus/menuDesat"));
 		bg.color = 0xFF9271FD;
 		bg.antialiasing = Options.antialiasing;
@@ -30,14 +23,13 @@ class ModSelectState extends FlxState {
 
 		names = [""].concat(Paths.listMods());
 		cur = Std.int(Math.max(0, names.indexOf(Paths.currentMod())));
-
 		grp = new FlxTypedGroup<Alphabet>();
 		add(grp);
 		for (i in 0...names.length) {
 			var label = names[i] == "" ? "base" : names[i];
 			var a = new Alphabet(0, 70 * i + 30, label);
 			if (a.members.length == 0)
-				a = new Alphabet(0, 70 * i + 30, "mod " + i); // nome so com caracteres que a fonte nao tem
+				a = new Alphabet(0, 70 * i + 30, "mod " + i);
 			a.isMenuItem = true;
 			a.targetY = i;
 			grp.add(a);
@@ -52,7 +44,6 @@ class ModSelectState extends FlxState {
 		hint.text = Lang.get("mods.hint") + Paths.modsDir();
 		hint.y = FlxG.height - hint.height - 6;
 		add(hint);
-
 		change(0);
 	}
 
@@ -79,7 +70,7 @@ class ModSelectState extends FlxState {
 		if (chosen != Paths.currentMod())
 			Paths.setMod(chosen);
 		if (FlxG.sound.music != null)
-			FlxG.sound.music.stop(); // a musica do menu pode vir do mod
+			FlxG.sound.music.stop();
 		TransitionSubState.go(new MainMenuState());
 	}
 

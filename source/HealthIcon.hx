@@ -1,10 +1,8 @@
 package;
 
 import flixel.FlxSprite;
-
 class HealthIcon extends FlxSprite {
 	public var sprTracker:FlxSprite;
-
 	public function new(name:String, isPlayer:Bool = false) {
 		super();
 		var g = Paths.image('icons/$name/icon');

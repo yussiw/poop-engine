@@ -18,39 +18,15 @@ import flixel.util.FlxTimer;
 import haxe.Json;
 import hscript.Parser;
 
-/**
- * Script HScript (.hx). Usado por: musicas/stages (PlayState), menus (data/states/*.hx) e qualquer coisa que
- * crie `new Script(code, nome, dono)`.
- *
- * FUNCOES QUE O SCRIPT PODE DEFINIR (cada state chama as suas; veja o README):
- *   onCreate, onCreatePost, onUpdate(elapsed), onUpdatePost(elapsed), onDestroy ...
- *   PlayState: onSongStart, onSongEnd, onStepHit(s), onBeatHit(b), onCountdown(i), onNoteSpawn(note),
- *   onNoteHit(note, rating), onOpponentHit(note), onMiss(note), onGhostTap(lane), onSplash(splash, note),
- *   onPopup(rating), onCameraMove(mustHit), onPause, onResume, onGameOver
- *   Eventos "cancelaveis": chame cancelEvent() dentro da funcao pra pular o comportamento padrao.
- *
- * VARIAVEIS GLOBAIS: state / game (o dono: PlayState, MainMenuState...), script, scriptName, shared (Map comum a
- *   todos os scripts), as classes do Flixel (FlxG, FlxSprite, FlxText, FlxTween, FlxEase, FlxTimer, FlxColor, ...),
- *   as da engine (Paths, Conductor, Options, Lang, Controls, Note, Strum, Character, ...), Math, Std, Reflect, Type, Json...
- *   Campos do dono podem ser LIDOS direto (ex.: `score`, `bf`, `health`); pra gravar use game.score = 5.
- * HELPERS: rgb, point, add/remove/insert, addHUD, createSprite, createText, playSound, timer, tween, image, sparrow,
- *   getText, getJson, exists, translate, option, switchState, importScript, disableScript, cancelEvent, setVar/getVar, trace,
- *   shader(nome), setShader(sprite, nome), setCameraShader(camera, nome)  [classe Shaders: veja Shaders.hx].
- * IMPORT: `import flixel.text.FlxText;` / `import x.y.Classe as Outro;` funcionam (classes ja incluidas no jogo).
- */
 class Script {
 	public static inline var VERSION:Int = 2;
 
-	/** Mapa compartilhado por todos os scripts (sobrevive a troca de state). Em script: shared["chave"] / shared.get("chave"). */
 	public static var shared:Map<String, Dynamic> = new Map();
-	/** true quando algum script chamou cancelEvent() durante o ultimo dispatch. */
-	public static var cancelled:Bool = false;
-	/** ultimos erros (parse/execucao), mais novo por ultimo. */
-	public static var errors:Array<String> = [];
 
+	public static var cancelled:Bool = false;
+	public static var errors:Array<String> = [];
 	static var globals:Map<String, Dynamic> = null;
 	static var importRe:EReg = ~/^[ \t]*import[ \t]+([A-Za-z0-9_.]+)([ \t]+as[ \t]+([A-Za-z0-9_]+))?[ \t\r]*;?[ \t\r]*$/gm;
-
 	public var interp:ScriptInterp;
 	public var name:String;
 	public var ok:Bool = false;
@@ -78,7 +54,6 @@ class Script {
 		run(code);
 	}
 
-	/** Executa mais codigo no mesmo escopo (usado por importScript). */
 	public function run(code:String):Bool {
 		try {
 			var parser = new Parser();
@@ -93,7 +68,6 @@ class Script {
 			return false;
 		}
 	}
-
 	function fail(msg:String):Void {
 		var m = '[script $name] $msg';
 		errors.push(m);
@@ -102,7 +76,6 @@ class Script {
 		trace(m);
 	}
 
-	/** Troca as linhas `import ...;` por linhas vazias (pra manter a numeracao) e define as classes no escopo. */
 	function preprocess(code:String):String {
 		return importRe.map(code, function(r:EReg):String {
 			var path = r.matched(1);
@@ -124,7 +97,6 @@ class Script {
 		});
 	}
 
-	// ------------------------------------------------------------------ chamadas
 	public function exists(fn:String):Bool {
 		var f = interp.variables.get(fn);
 		return f != null && Reflect.isFunction(f);
@@ -149,8 +121,6 @@ class Script {
 
 	public function set(n:String, v:Dynamic):Void
 		interp.variables.set(n, v);
-
-	/** Chama `fn` em todos os scripts. Retorna true se algum chamou cancelEvent(). */
 	public static function callAll(list:Array<Script>, fn:String, ?args:Array<Dynamic>):Bool {
 		cancelled = false;
 		for (s in list)
@@ -159,8 +129,6 @@ class Script {
 		cancelled = false;
 		return c;
 	}
-
-	// ------------------------------------------------------------------ helpers expostos ao script
 	function setupHelpers(v:Map<String, Dynamic>):Void {
 		var self = this;
 		var o:Dynamic = owner;
@@ -238,7 +206,6 @@ class Script {
 		});
 	}
 
-	/** switchState("menu" | "freeplay" | "options" | "mods" | "play" | "editor" | "credits") ou uma instancia de FlxState. */
 	public static function switchState(s:Dynamic):Void {
 		var st:flixel.FlxState = null;
 		if (Std.isOfType(s, String)) {
@@ -260,12 +227,11 @@ class Script {
 			states.TransitionSubState.go(st);
 	}
 
-	// ------------------------------------------------------------------ classes globais
 	public static function getGlobals():Map<String, Dynamic> {
 		if (globals != null)
 			return globals;
 		var g:Map<String, Dynamic> = new Map();
-		// Flixel
+
 		g.set("FlxG", FlxG);
 		g.set("FlxSprite", FlxSprite);
 		g.set("FlxObject", FlxObject);
@@ -279,7 +245,7 @@ class Script {
 		g.set("FlxSound", FlxSound);
 		g.set("FlxGroup", FlxGroup);
 		g.set("FlxSpriteGroup", FlxSpriteGroup);
-		// abstracts / enums viram objetos (hscript nao enxerga abstract direto)
+
 		g.set("FlxColor", {
 			TRANSPARENT: FlxColor.TRANSPARENT, WHITE: FlxColor.WHITE, GRAY: FlxColor.GRAY, BLACK: FlxColor.BLACK, GREEN: FlxColor.GREEN,
 			LIME: FlxColor.LIME, YELLOW: FlxColor.YELLOW, ORANGE: FlxColor.ORANGE, RED: FlxColor.RED, PURPLE: FlxColor.PURPLE,
@@ -298,7 +264,7 @@ class Script {
 			OUTLINE: FlxTextBorderStyle.OUTLINE,
 			OUTLINE_FAST: FlxTextBorderStyle.OUTLINE_FAST
 		});
-		// Haxe
+
 		g.set("Math", Math);
 		g.set("Std", Std);
 		g.set("StringTools", StringTools);
@@ -307,7 +273,7 @@ class Script {
 		g.set("Json", Json);
 		g.set("Lambda", Lambda);
 		g.set("Date", Date);
-		// engine
+
 		g.set("Paths", Paths);
 		g.set("Conductor", Conductor);
 		g.set("Controls", Controls);
