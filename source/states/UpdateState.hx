@@ -67,6 +67,7 @@ class UpdateState extends FlxState {
 				if (wait > 1.5)
 					leave();
 			case Downloading:
+				Updater.poll();
 				txt.text = Lang.fmt("upd.dl.downloading", ["pct" => Std.string(Std.int(Updater.progress * 100)), "done" => mb(Updater.loaded), "total" => mb(Updater.total)]);
 			case Downloaded:
 				txt.text = Lang.get("upd.dl.installing");

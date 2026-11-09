@@ -65,12 +65,17 @@ class Updater {
 			}
 		}, function(_) {
 			if (my == session)
-				phase = Failed("net");
+				phase = Failed("net " + Updates.lastError);
 		});
 	}
 
 	public static function cancel():Void {
 		session++;
+		#if android
+		try {
+			lime.system.JNI.createStaticMethod("org/poopengine/ApkDownloader", "cancel", "()V")();
+		} catch (e:Dynamic) {}
+		#end
 		data = null;
 		phase = Idle;
 	}
@@ -100,32 +105,50 @@ class Updater {
 
 	static function download(my:Int):Void {
 		phase = Downloading;
+		// mostra o tamanho total desde o inicio (vem do JSON da release), mesmo antes de chegar o 1o byte
+		total = assetSize;
+		#if android
 		try {
-			var r = new HTTPRequest<Bytes>(assetUrl);
-			r.userAgent = "PoopEngine/" + Updates.version();
-			r.timeout = 600000;
-			var f = r.load();
-			f.onProgress(function(l:Int, t:Int) {
-				if (my != session)
-					return;
-				loaded = l;
-				total = t > 0 ? t : assetSize;
-				progress = total > 0 ? Math.min(1, l / total) : 0;
-			});
-			f.onComplete(function(b:Bytes) {
-				if (my != session)
-					return;
-				data = b;
-				progress = 1;
-				phase = Downloaded;
-			});
-			f.onError(function(e:Dynamic) {
-				if (my == session)
-					phase = Failed("download");
-			});
+			var dir = haxe.io.Path.addTrailingSlash(lime.system.System.applicationStorageDirectory);
+			Paths.ensureDir(dir);
+			apkPath = dir + "update.apk";
+			var fnStart = lime.system.JNI.createStaticMethod("org/poopengine/ApkDownloader", "start", "(Ljava/lang/String;Ljava/lang/String;)I");
+			var fnSize = lime.system.JNI.createStaticMethod("org/poopengine/ApkDownloader", "setTotal", "(I)V");
+			fnStart(assetUrl, apkPath);
+			fnSize(assetSize);
 		} catch (e:Dynamic) {
-			phase = Failed("download");
+			phase = Failed("download: " + Std.string(e).substr(0, 60));
 		}
+		#end
+	}
+
+	/** Chamar todo frame enquanto phase == Downloading (UpdateState faz isso). */
+	public static function poll():Void {
+		#if android
+		if (phase != Downloading)
+			return;
+		try {
+			var fnLoaded = lime.system.JNI.createStaticMethod("org/poopengine/ApkDownloader", "loaded", "()I");
+			var fnTotal = lime.system.JNI.createStaticMethod("org/poopengine/ApkDownloader", "total", "()I");
+			var fnState = lime.system.JNI.createStaticMethod("org/poopengine/ApkDownloader", "state", "()I");
+			var fnError = lime.system.JNI.createStaticMethod("org/poopengine/ApkDownloader", "error", "()Ljava/lang/String;");
+			loaded = fnLoaded();
+			var t:Int = fnTotal();
+			if (t > 0)
+				total = t;
+			progress = total > 0 ? Math.min(1, loaded / total) : 0;
+			switch (fnState()) {
+				case 1:
+					progress = 1;
+					phase = Downloaded;
+				case 2:
+					phase = Failed("download " + Std.string(fnError()));
+				default:
+			}
+		} catch (e:Dynamic) {
+			phase = Failed("poll: " + Std.string(e).substr(0, 60));
+		}
+		#end
 	}
 
 	/** Chamar na thread principal (UpdateState faz isso). Tambem serve pra tentar de novo depois de dar a permissao. */

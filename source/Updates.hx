@@ -20,6 +20,7 @@ class Updates {
 	public static var latestSha:String = "";
 	public static var latestMessage:String = "";
 	public static var latestDate:String = "";
+	public static var lastError:String = "";
 	static var req:HTTPRequest<String>;
 
 	public static function version():String {
@@ -107,8 +108,12 @@ class Updates {
 			r.timeout = 12000;
 			r.headers.push(new lime.net.HTTPRequestHeader("Accept", "application/vnd.github+json"));
 			req = r;
-			r.load().onComplete(function(t:String) ok(t)).onError(function(e:Dynamic) fail(e));
+			r.load().onComplete(function(t:String) ok(t)).onError(function(e:Dynamic) {
+				lastError = Std.string(e);
+				fail(e);
+			});
 		} catch (e:Dynamic) {
+			lastError = "excecao: " + Std.string(e);
 			fail(e);
 		}
 	}
@@ -127,6 +132,8 @@ class Updates {
 		b.add(Lang.get("upd.built") + ": " + GitInfo.buildDate + "   " + Lang.get("upd.platform") + ": " + platform() + "\n");
 		b.add(Lang.get("upd.repo") + ": " + GitInfo.repo + "\n\n");
 		b.add(Lang.get("upd.status") + ": " + statusText());
+		if (status == Failed && lastError != "")
+			b.add("\nerro: " + lastError);
 		if (latestSha != "")
 			b.add("\n" + Lang.get("upd.latest") + ": " + latestSha.substr(0, 7) + (latestMessage == "" ? "" : "  " + latestMessage) + (latestDate == "" ? "" : "  (" + latestDate + ")"));
 		return b.toString();

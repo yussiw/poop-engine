@@ -1,0 +1,53 @@
+name: Build Linux
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.6
+
+      - name: Dependencias do sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ g++-multilib libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libx11-dev libxext-dev libxi-dev libxrandr-dev libxinerama-dev libpulse-dev libdbus-1-dev libudev-dev libopenal-dev
+
+      - name: Instalar libs
+        run: |
+          haxelib setup ~/haxelib
+          haxelib install lime 8.1.2 --quiet
+          haxelib install openfl 9.3.3 --quiet
+          haxelib install flixel 5.6.1 --quiet
+          haxelib install flixel-addons 3.2.2 --quiet
+          haxelib install hscript 2.5.0 --quiet
+          haxelib install hxcpp --quiet
+
+      - name: Compilar
+        run: haxelib run lime build linux -final
+
+      - name: Empacotar (tar.gz mantem a permissao de executavel)
+        run: tar -czf PoopEngine-linux.tar.gz -C export/release/linux/bin .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PoopEngine-linux
+          path: PoopEngine-linux.tar.gz
+
+      - name: Publicar release (nightly-linux)
+        if: github.ref_name == github.event.repository.default_branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          cp PoopEngine-linux.tar.gz "PoopEngine-linux-$SHORT.tar.gz"
+          gh release delete nightly-linux --cleanup-tag --yes || true
+          gh release create nightly-linux "PoopEngine-linux-$SHORT.tar.gz" --target "$GITHUB_SHA" --title "Linux $SHORT" --notes "$(git log -1 --pretty=%s)" --prerelease

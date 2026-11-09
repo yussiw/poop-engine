@@ -1,0 +1,54 @@
+name: Build Windows
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.6
+
+      - name: Instalar libs
+        run: |
+          haxelib setup C:/haxelib
+          haxelib install lime 8.1.2 --quiet
+          haxelib install openfl 9.3.3 --quiet
+          haxelib install flixel 5.6.1 --quiet
+          haxelib install flixel-addons 3.2.2 --quiet
+          haxelib install hscript 2.5.0 --quiet
+          haxelib install hxcpp --quiet
+
+      - name: Compilar
+        run: haxelib run lime build windows -final
+
+      - name: Mostrar linhas do Character.h (so se falhar)
+        if: failure()
+        run: |
+          Get-Content export/release/windows/obj/include/Character.h | Select-Object -First 70 | ForEach-Object -Begin {$i=0} -Process {$i++; "$i`: $_"}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PoopEngine-windows
+          path: export/release/windows/bin
+
+      - name: Zipar
+        run: Compress-Archive -Path export/release/windows/bin/* -DestinationPath PoopEngine-windows.zip
+
+      - name: Publicar release (nightly-windows)
+        if: github.ref_name == github.event.repository.default_branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          cp PoopEngine-windows.zip "PoopEngine-windows-$SHORT.zip"
+          gh release delete nightly-windows --cleanup-tag --yes || true
+          gh release create nightly-windows "PoopEngine-windows-$SHORT.zip" --target "$GITHUB_SHA" --title "Windows $SHORT" --notes "$(git log -1 --pretty=%s)" --prerelease
