@@ -67,6 +67,14 @@ se a branch tem commits novos (`Updates.hx`; abre a categoria e ela checa sozinh
 - O texto de versao no menu principal tambem mostra o hash curto. Scripts podem ler `GitInfo.short`, `GitInfo.commit`, `Updates.status`...
 - Uma categoria de mod pode ter painel de texto igual: `Options.infoPanels.set("minhaCategoria", function() return "texto");` (+ opcoes `type: "action"`).
 
+### Atualizar dentro do jogo (Android)
+Opcoes -> atualizacoes -> **baixar e instalar atualizacao** abre a tela do `funkay.png` com a barra roxa no rodape (`states/UpdateState.hx`, logica em `Updater.hx`).
+Ele baixa o APK da release `nightly` (o workflow publica uma a cada push na branch principal), e o Android pede a confirmacao da instalacao (`java/org/poopengine/ApkInstaller.java`).
+- **O Android fecha o jogo sozinho quando termina de instalar** e nao deixa o app se reabrir; o jogador toca no icone de novo (ou em "Abrir" no instalador).
+- Na primeira vez o Android pede pra permitir "instalar apps desconhecidos" pro Poop Engine; depois de permitir, volte e toque na tela.
+- **Assinatura fixa (obrigatorio):** crie uma vez `keytool -genkey -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"`,
+  converta com `base64 -w0 debug.keystore` e salve como secret **DEBUG_KEYSTORE_BASE64** no repositorio (Settings -> Secrets -> Actions). Sem isso cada build sai assinada diferente e o Android recusa a atualizacao.
+
 ### Shaders
 Arquivos GLSL em `assets/shaders/<nome>.frag` (e `.vert` opcional); um mod substitui/cria em `<mod>/shaders/`. Comece o `.frag` com `#pragma header` e use
 `flixel_texture2D(bitmap, openfl_TextureCoordv)` pra ler a imagem. Se declarar `uniform float iTime;` / `uniform vec2 iResolution;` a engine atualiza sozinha.

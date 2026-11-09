@@ -79,5 +79,15 @@
   "upd.status.behind": "{n} commit(s) novo(s) no GitHub",
   "upd.status.ahead": "esta build está à frente do GitHub",
   "upd.status.unknown": "o commit desta build não foi achado no GitHub",
-  "upd.status.failed": "não foi possível verificar (sem internet?)"
+  "upd.status.failed": "não foi possível verificar (sem internet?)",
+  "opt.updInstall": "baixar e instalar atualização",
+  "opt.updInstall.desc": "Baixa o APK mais novo do GitHub e instala por cima. O Android fecha o jogo no final; é só abrir de novo.",
+  "upd.dl.checking": "procurando atualização...",
+  "upd.dl.uptodate": "você já está na versão mais nova!",
+  "upd.dl.downloading": "baixando... {pct}%  ({done} / {total} MB)",
+  "upd.dl.installing": "instalando... confirme na tela do Android",
+  "upd.dl.permission": "permita \"instalar apps desconhecidos\" pro Poop Engine, volte e toque na tela",
+  "upd.dl.failed": "não deu pra atualizar",
+  "upd.dl.unsupported": "atualização automática só no Android",
+  "upd.dl.back": "toque pra voltar"
 }

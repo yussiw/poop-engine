@@ -23,6 +23,8 @@
 	<config:android permission="android.permission.READ_MEDIA_IMAGES" if="android" />
 	<config:android permission="android.permission.READ_MEDIA_VIDEO" if="android" />
 	<config:android permission="android.permission.READ_MEDIA_AUDIO" if="android" />
+	<config:android permission="android.permission.REQUEST_INSTALL_PACKAGES" if="android" />
+	<java path="java" if="android" />
 
 	<classpath name="source" />
 	<assets path="assets" rename="assets" />

@@ -100,7 +100,7 @@ class Updates {
 			latestDate = who != null && who.date != null ? StringTools.replace(Std.string(who.date).substr(0, 16), "T", " ") : "";
 		}
 	}
-	static function get(url:String, ok:String->Void, fail:Dynamic->Void):Void {
+	public static function get(url:String, ok:String->Void, fail:Dynamic->Void):Void {
 		try {
 			var r = new HTTPRequest<String>(url);
 			r.userAgent = "PoopEngine/" + version();

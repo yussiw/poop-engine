@@ -79,5 +79,15 @@
   "upd.status.behind": "{n} new commit(s) available on GitHub",
   "upd.status.ahead": "this build is ahead of GitHub",
   "upd.status.unknown": "this build's commit was not found on GitHub",
-  "upd.status.failed": "could not check (no internet?)"
+  "upd.status.failed": "could not check (no internet?)",
+  "opt.updInstall": "download and install update",
+  "opt.updInstall.desc": "Downloads the newest APK from GitHub and installs over this one. Android closes the game at the end; just open it again.",
+  "upd.dl.checking": "looking for updates...",
+  "upd.dl.uptodate": "you are on the latest version!",
+  "upd.dl.downloading": "downloading... {pct}%  ({done} / {total} MB)",
+  "upd.dl.installing": "installing... confirm on the Android screen",
+  "upd.dl.permission": "allow \"install unknown apps\" for Poop Engine, come back and tap the screen",
+  "upd.dl.failed": "could not update",
+  "upd.dl.unsupported": "auto update is Android only",
+  "upd.dl.back": "tap to go back"
 }

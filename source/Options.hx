@@ -60,6 +60,9 @@ class Options {
 
 		register({id: "language", category: "language", type: "choice", def: "pt-BR", choices: Lang.available});
 		register({id: "updCheck", category: "updates", type: "action", action: function() Updates.check()});
+		#if android
+		register({id: "updInstall", category: "updates", type: "action", action: function() states.TransitionSubState.go(new states.UpdateState())});
+		#end
 		register({id: "updGithub", category: "updates", type: "action", action: function() Updates.openRepo()});
 		infoPanels.set("updates", Updates.panelText);
 	}
