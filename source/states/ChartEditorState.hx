@@ -6,6 +6,7 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.input.keyboard.FlxKey;
 import flixel.sound.FlxSound;
 import flixel.text.FlxText;
+import flixel.text.FlxTextBorderStyle;
 import flixel.util.FlxColor;
 import haxe.Json;
 import openfl.geom.Rectangle;
@@ -518,7 +519,7 @@ class ChartEditorState extends FlxState {
 			if (ey < GY0 - 8 || ey > GY0 + GH + 8) continue;
 			var col = ev.type == "bpm" ? 0xFFFFB347 : (ev.type == "character" ? 0xFFB58CFF : (ev.type == "hud" ? 0xFF55D6BE : (ev.type == "camera" ? 0xFF65B8FF : 0xFFFFD65A)));
 			poolRect(eventPool, gx, ey - 2, 8 * cw, 4, col); poolRect(eventPool, gx + 3, ey - 7, 10, 14, col);
-			var et = getEventText(); et.text = (i == eventIndex ? "▶ " : "") + ev.type.toUpperCase() + " · step " + Math.round(ev.step); et.setPosition(gx + 16, ey - 18); et.color = 0xFFFFFFFF; et.background = true; et.backgroundColor = 0xCC101116;
+			var et = getEventText(); et.text = (i == eventIndex ? "▶ " : "") + ev.type.toUpperCase() + " · step " + Math.round(ev.step); et.setPosition(gx + 16, ey - 18); et.color = 0xFFFFFFFF; et.borderStyle = FlxTextBorderStyle.OUTLINE; et.borderColor = 0xFF101116; et.borderSize = 1;
 		}
 		poolEnd(eventPool); for (i in eventTextN...eventTexts.length) eventTexts[i].visible = false;
 		for (l in 0...8)
