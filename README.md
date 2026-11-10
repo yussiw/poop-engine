@@ -115,3 +115,10 @@ Credits
 Development Status
 
 Poop Engine is still a work in progress. Features and systems may change as development continues.
+
+## Chart Editor — personagens e eventos
+
+- Toque no ícone do Jogador ou do Oponente no topo para abrir a seleção de personagem.
+- Use “Adicionar” no seletor para incluir personagens disponíveis no elenco da música.
+- Os eventos aparecem na grade como linhas coloridas com o tipo e o step; toque na linha para selecionar e abrir a aba Eventos.
+- A aba Eventos usa texto compacto para evitar que a descrição cubra os controles.

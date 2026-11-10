@@ -81,6 +81,9 @@ class ChartEditorState extends FlxState {
 	var eventIndex:Int = -1;
 	var eventTypes:Array<String> = ["zoom", "camera", "hud", "bpm", "character"];
 	var characterIds:Array<String> = [];
+	var availableCharacterIds:Array<String> = [];
+	var charPopupOpen:Bool = false;
+	var charPopupBtns:Array<EdBtn> = [];
 	var must:Array<Bool> = [true];
 	var sel:Array<EdNote> = [];
 	var clip:Array<EdClip> = [];
@@ -113,6 +116,10 @@ class ChartEditorState extends FlxState {
 	var linePool:EdPool;
 	var camPool:EdPool;
 	var ringPool:EdPool;
+	var eventPool:EdPool;
+	var eventTextGrp:FlxTypedGroup<FlxText>;
+	var eventTexts:Array<FlxText> = [];
+	var eventTextN:Int = 0;
 	var susPool:EdPool;
 	var camTexts:Array<FlxText> = [];
 	var camTextN:Int = 0;
@@ -190,6 +197,9 @@ class ChartEditorState extends FlxState {
 		camTxtGrp = new FlxTypedGroup<FlxText>();
 		add(camTxtGrp);
 		ringPool = mkPool();
+		eventPool = mkPool();
+		eventTextGrp = new FlxTypedGroup<FlxText>();
+		add(eventTextGrp);
 		susPool = mkPool();
 		for (i in 0...8) {
 			var s = new Strum(0, 0, i % 4);
@@ -250,18 +260,11 @@ class ChartEditorState extends FlxState {
 			for (e in loadedEvents)
 				events.push({step: e.step != null ? e.step : 0, type: e.type != null ? e.type : "zoom", value: e.value, target: e.target != null ? e.target : "player"});
 		}
-		if (songObj.characters != null) {
-			var savedCharacters:Array<String> = songObj.characters;
-			characterIds = savedCharacters.copy();
-		} else
-			characterIds = [Std.string(songObj.player1), Std.string(songObj.player2), "bf-dead"];
-		if (characterIds.indexOf("bf") < 0) characterIds.push("bf");
-		if (characterIds.indexOf("dad") < 0) characterIds.push("dad");
-		for (path in Paths.list("data/characters", "json")) {
-			var base = path.substr(path.lastIndexOf("/") + 1);
-			var id = base.substr(0, base.length - 5);
-			if (characterIds.indexOf(id) < 0) characterIds.push(id);
-		}
+		// O elenco da música contém somente os personagens escolhidos; a biblioteca fica separada.
+		characterIds = [];
+		for (id in [Std.string(songObj.player1), Std.string(songObj.player2)]) if (id != "null" && characterIds.indexOf(id) < 0) characterIds.push(id);
+		availableCharacterIds = ["bf", "dad", "bf-dead"];
+		for (path in Paths.list("data/characters", "json")) { var base = path.substr(path.lastIndexOf("/") + 1); var id = base.substr(0, base.length - 5); if (availableCharacterIds.indexOf(id) < 0) availableCharacterIds.push(id); }
 		var sc = stepMs();
 
 		must = [];
@@ -509,6 +512,15 @@ class ChartEditorState extends FlxState {
 		}
 		poolEnd(ringPool);
 		poolEnd(susPool);
+		poolBegin(eventPool); eventTextN = 0;
+		for (i in 0...events.length) {
+			var ev = events[i]; var ey = yOfStep(ev.step);
+			if (ey < GY0 - 8 || ey > GY0 + GH + 8) continue;
+			var col = ev.type == "bpm" ? 0xFFFFB347 : (ev.type == "character" ? 0xFFB58CFF : (ev.type == "hud" ? 0xFF55D6BE : (ev.type == "camera" ? 0xFF65B8FF : 0xFFFFD65A)));
+			poolRect(eventPool, gx, ey - 2, 8 * cw, 4, col); poolRect(eventPool, gx + 3, ey - 7, 10, 14, col);
+			var et = getEventText(); et.text = (i == eventIndex ? "▶ " : "") + ev.type.toUpperCase() + " · step " + Math.round(ev.step); et.setPosition(gx + 16, ey - 18); et.color = 0xFFFFFFFF; et.background = true; et.backgroundColor = 0xCC101116;
+		}
+		poolEnd(eventPool); for (i in eventTextN...eventTexts.length) eventTexts[i].visible = false;
 		for (l in 0...8)
 			for (i in headN[l]...heads[l].length)
 				heads[l][i].visible = false;
@@ -518,6 +530,12 @@ class ChartEditorState extends FlxState {
 		viewMark.updateHitbox();
 		viewMark.setPosition(SEEK_X + 1, GY0 + Math.max(0, Math.min(1, topT / songLenMs)) * GH);
 	}
+	function getEventText():FlxText {
+		var t:FlxText;
+		if (eventTextN >= eventTexts.length) { t = new FlxText(0, 0, 220, "", 10); t.setFormat(Paths.font("ui.ttf"), 10, C_TEXT, FlxTextAlign.LEFT); t.scrollFactor.set(); eventTextGrp.add(t); eventTexts.push(t); } else t = eventTexts[eventTextN];
+		eventTextN++; t.visible = true; return t;
+	}
+
 	function rebuildMap():Void {
 		mapDirty = false;
 		var lastMs = 0.0;
@@ -588,6 +606,23 @@ class ChartEditorState extends FlxState {
 			tabTexts.push({t: t, tab: tab});
 		return t;
 	}
+	function openCharacterPicker(target:String):Void {
+		for (b in charPopupBtns) b.on = false; charPopupBtns = [];
+		var x = 430.0; var y = 58.0;
+		var n = 0;
+		for (id in characterIds) { if (n >= 10) break; var cid = id; charPopupBtns.push(mk(x + 12 + (n % 2) * 168, y + 8 + Std.int(n / 2) * 42, 160, 34, cid, function() chooseSongCharacter(target, cid), 0, 13)); n++; }
+		var next = ""; for (id in availableCharacterIds) if (characterIds.indexOf(id) < 0) { next = id; break; }
+		var addId = next; charPopupBtns.push(mk(x + 12, y + 230, 220, 36, next == "" ? "Todos adicionados" : "＋ Adicionar: " + next, function() { if (addId != "") { characterIds.push(addId); markDirty(); openCharacterPicker(target); } }, 1, 12));
+		charPopupBtns.push(mk(x + 244, y + 230, 104, 36, "Fechar", function() { closeCharacterPicker(); }, 0, 13)); charPopupOpen = true;
+	}
+	function closeCharacterPicker():Void { charPopupOpen = false; for (b in charPopupBtns) b.on = false; }
+	function chooseSongCharacter(target:String, id:String):Void {
+		pushUndo(); if (target == "player") Reflect.setField(songObj, "player1", id); else Reflect.setField(songObj, "player2", id);
+		if (characterIds.indexOf(id) < 0) characterIds.push(id); var index = target == "player" ? 1 : 0;
+		var oldIcon = hdrIcons[index]; var oldX = oldIcon.x; var oldY = oldIcon.y; remove(oldIcon, true); oldIcon.destroy();
+		var newIcon = new HealthIcon(charIcon(id), target == "player"); newIcon.setGraphicSize(32, 32); newIcon.updateHitbox(); newIcon.setPosition(oldX, oldY); add(newIcon); hdrIcons[index] = newIcon; markDirty(); closeCharacterPicker(); setStatus("Personagem alterado: " + id);
+	}
+
 	function charIcon(id:Dynamic):String {
 		var cj:Dynamic = id != null ? Paths.json('data/characters/' + Std.string(id) + '.json') : null;
 		return (cj != null && cj.icon != null) ? Std.string(cj.icon) : "face";
@@ -712,7 +747,7 @@ class ChartEditorState extends FlxState {
 		mk(RX, 362, RW, 36, "Alvo: jogador/oponente", cycleEventTarget, 0, 13, 3);
 		mk(RX, 406, RW, 36, "Mover para posição atual", moveEventHere, 0, 14, 3);
 		mk(RX, 450, RW, 36, "Remover evento", removeEvent, 2, 14, 3);
-		label(RX, 496, RW, 100, C_MUTED, FlxTextAlign.LEFT, 3).text = "Eventos são disparados no step indicado. Zoom: valor em escala (ex. 1.2). Câmera: player/opponent. HUD: true/false. BPM: novo BPM. Personagem: ID cadastrado em characters.";
+		label(RX, 496, RW, 12, C_MUTED, FlxTextAlign.LEFT, 3).text = "Eventos são disparados no step indicado. Zoom: valor em escala (ex. 1.2). Câmera: player/opponent. HUD: true/false. BPM: novo BPM. Personagem: ID cadastrado em characters.";
 		setRightTab(rightTab);
 
 		mini = new FlxSprite(SEEK_X, GY0).makeGraphic(SEEK_W, GH, C_PANEL, true);
@@ -1209,6 +1244,10 @@ class ChartEditorState extends FlxState {
 	function handlePointer(elapsed:Float):Void {
 		readPointer();
 		if (pJust) {
+			if (charPopupOpen) { var inside = false; for (b in charPopupBtns) if (btnHit(b, px, py)) inside = true; if (!inside) closeCharacterPicker(); }
+			if (!charPopupOpen && py >= 4 && py <= 52) {
+				for (i in 0...hdrIcons.length) { var ic = hdrIcons[i]; if (px >= ic.x - 8 && px <= ic.x + ic.width + 8 && py >= ic.y - 8 && py <= ic.y + ic.height + 8) { openCharacterPicker(i == 1 ? "player" : "opponent"); return; } }
+			}
 			gKind = 0;
 			pressedBtn = null;
 			for (b in btns)
@@ -1223,6 +1262,9 @@ class ChartEditorState extends FlxState {
 				if (playing)
 					stopPlay();
 			} else if (gKind == 0 && inGrid(px, py)) {
+				var pickedEvent = -1; var bestDist = 12.0;
+				for (i in 0...events.length) { var dist = Math.abs(yOfStep(events[i].step) - py); if (dist < bestDist) { bestDist = dist; pickedEvent = i; } }
+				if (pickedEvent >= 0) { eventIndex = pickedEvent; setTime(events[eventIndex].step * stepMs()); setRightTab(3); setStatus("Evento " + events[eventIndex].type + " · step " + Math.round(events[eventIndex].step)); return; }
 				gKind = 3;
 				gSX = px;
 				gSY = py;
@@ -1436,6 +1478,8 @@ class ChartEditorState extends FlxState {
 			Reflect.setField(out, "song", songName);
 			Reflect.setField(out, "bpm", bpm);
 			Reflect.setField(out, "speed", speed);
+			Reflect.setField(out, "player1", songObj.player1);
+			Reflect.setField(out, "player2", songObj.player2);
 			Reflect.setField(out, "notes", secs);
 			events.sort(function(a, b) return a.step < b.step ? -1 : (a.step > b.step ? 1 : 0));
 			Reflect.setField(out, "events", events);
