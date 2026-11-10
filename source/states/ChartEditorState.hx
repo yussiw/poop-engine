@@ -32,9 +32,10 @@ typedef EdBtn = {
 };
 typedef EdTabText = {t:FlxText, tab:Int};
 typedef EdPool = {arr:Array<FlxSprite>, grp:FlxTypedGroup<FlxSprite>, n:Int};
-typedef EdSnap = {notes:Array<EdNote>, must:Array<Bool>};
 typedef EdExtra = {t:Float, arr:Array<Dynamic>};
 typedef EdClip = {d:Float, lane:Int, sus:Float};
+typedef EdEvent = {step:Float, type:String, value:Dynamic, target:String};
+typedef EdSnap = {notes:Array<EdNote>, must:Array<Bool>, events:Array<EdEvent>};
 class ChartEditorState extends FlxState {
 	public static var songId:String = "demo";
 	public static var isNew:Bool = false;
@@ -76,6 +77,10 @@ class ChartEditorState extends FlxState {
 	var speed:Float = 2;
 	var notes:Array<EdNote> = [];
 	var extras:Array<EdExtra> = [];
+	var events:Array<EdEvent> = [];
+	var eventIndex:Int = -1;
+	var eventTypes:Array<String> = ["zoom", "camera", "hud", "bpm", "character"];
+	var characterIds:Array<String> = [];
 	var must:Array<Bool> = [true];
 	var sel:Array<EdNote> = [];
 	var clip:Array<EdClip> = [];
@@ -229,6 +234,8 @@ class ChartEditorState extends FlxState {
 				player1: "bf",
 				player2: "dad",
 				stage: "default",
+				characters: ["bf", "dad", "bf-dead"],
+				events: [],
 				notes: []
 			};
 		} else
@@ -237,6 +244,24 @@ class ChartEditorState extends FlxState {
 		songName = songObj.song != null ? Std.string(songObj.song) : songId;
 		bpm = songObj.bpm != null ? songObj.bpm : 102;
 		speed = songObj.speed != null ? songObj.speed : 2;
+		events = [];
+		if (songObj.events != null) {
+			var loadedEvents:Array<Dynamic> = songObj.events;
+			for (e in loadedEvents)
+				events.push({step: e.step != null ? e.step : 0, type: e.type != null ? e.type : "zoom", value: e.value, target: e.target != null ? e.target : "player"});
+		}
+		if (songObj.characters != null) {
+			var savedCharacters:Array<String> = songObj.characters;
+			characterIds = savedCharacters.copy();
+		} else
+			characterIds = [Std.string(songObj.player1), Std.string(songObj.player2), "bf-dead"];
+		if (characterIds.indexOf("bf") < 0) characterIds.push("bf");
+		if (characterIds.indexOf("dad") < 0) characterIds.push("dad");
+		for (path in Paths.list("data/characters", "json")) {
+			var base = path.substr(path.lastIndexOf("/") + 1);
+			var id = base.substr(0, base.length - 5);
+			if (characterIds.indexOf(id) < 0) characterIds.push(id);
+		}
 		var sc = stepMs();
 
 		must = [];
@@ -637,9 +662,9 @@ class ChartEditorState extends FlxState {
 		}
 		label(LX, 590, LW, 12, C_MUTED, FlxTextAlign.LEFT).text = "Toque: põe/tira nota\nArraste a nota para baixo: sustain\nArraste no vazio: rolar a grade\nToque na faixa à esquerda: foco da câmera";
 
-		var tw = (RW - 16) / 3;
-		var tabNames = ["Seção", "Áudio", "Música"];
-		for (i in 0...3) {
+		var tw = (RW - 24) / 4;
+		var tabNames = ["Seção", "Áudio", "Música", "Eventos"];
+		for (i in 0...4) {
 			var ti = i;
 			tabBtns.push(mk(RX + i * (tw + 8), 68, tw, 36, tabNames[i], function() setRightTab(ti), 3));
 		}
@@ -678,6 +703,16 @@ class ChartEditorState extends FlxState {
 		var h2 = (RW - 8) / 2;
 		mk(RX, 292, h2, 36, "−", function() changeSpeed(-0.1), 0, 17, 2);
 		mk(RX + h2 + 8, 292, h2, 36, "+", function() changeSpeed(0.1), 0, 17, 2);
+		label(RX, 120, RW, 12, C_MUTED, FlxTextAlign.LEFT, 3).text = "EVENTOS NA POSIÇÃO ATUAL";
+		mk(RX, 140, RW, 38, "＋ Adicionar evento", addEvent, 1, 15, 3);
+		mk(RX, 186, RW, 36, "Evento anterior", function() selectEvent(-1), 0, 14, 3);
+		mk(RX, 230, RW, 36, "Próximo evento", function() selectEvent(1), 0, 14, 3);
+		mk(RX, 274, RW, 36, "Tipo: trocar", cycleEventType, 0, 14, 3);
+		mk(RX, 318, RW, 36, "Valor: trocar", cycleEventValue, 0, 14, 3);
+		mk(RX, 362, RW, 36, "Alvo: jogador/oponente", cycleEventTarget, 0, 13, 3);
+		mk(RX, 406, RW, 36, "Mover para posição atual", moveEventHere, 0, 14, 3);
+		mk(RX, 450, RW, 36, "Remover evento", removeEvent, 2, 14, 3);
+		label(RX, 496, RW, 100, C_MUTED, FlxTextAlign.LEFT, 3).text = "Eventos são disparados no step indicado. Zoom: valor em escala (ex. 1.2). Câmera: player/opponent. HUD: true/false. BPM: novo BPM. Personagem: ID cadastrado em characters.";
 		setRightTab(rightTab);
 
 		mini = new FlxSprite(SEEK_X, GY0).makeGraphic(SEEK_W, GH, C_PANEL, true);
@@ -698,6 +733,67 @@ class ChartEditorState extends FlxState {
 			t.t.visible = t.tab == i;
 	}
 
+	function addEvent():Void {
+		pushUndo();
+		var e:EdEvent = {step: Math.max(0, snapRound(curStep())), type: "zoom", value: 1.2, target: "player"};
+		events.push(e);
+		events.sort(function(a, b) return a.step < b.step ? -1 : 1);
+		eventIndex = events.indexOf(e);
+		markDirty();
+		setStatus("Evento criado no step " + Math.round(e.step) + ".");
+	}
+	function selectEvent(d:Int):Void {
+		if (events.length == 0) { eventIndex = -1; setStatus("Nenhum evento cadastrado."); return; }
+		eventIndex = eventIndex < 0 ? 0 : (eventIndex + d + events.length) % events.length;
+		setTime(events[eventIndex].step * stepMs());
+		setStatus("Evento " + (eventIndex + 1) + "/" + events.length + " · step " + Math.round(events[eventIndex].step));
+	}
+	function cycleEventType():Void {
+		if (eventIndex < 0 || eventIndex >= events.length) { setStatus("Selecione ou crie um evento.", true); return; }
+		pushUndo();
+		var e = events[eventIndex];
+		e.type = eventTypes[(eventTypes.indexOf(e.type) + 1 + eventTypes.length) % eventTypes.length];
+		e.value = switch (e.type) { case "zoom": 1.2; case "camera": "player"; case "hud": false; case "bpm": 120; default: characterIds.length > 0 ? characterIds[0] : "bf"; };
+		markDirty();
+	}
+	function cycleEventValue():Void {
+		if (eventIndex < 0 || eventIndex >= events.length) return;
+		pushUndo();
+		var e = events[eventIndex];
+		switch (e.type) {
+			case "zoom": e.value = e.value == null ? 1.2 : (e.value >= 1.5 ? 0.7 : e.value + 0.2);
+			case "camera": e.value = e.value == "player" ? "opponent" : "player";
+			case "hud": e.value = e.value != true;
+			case "bpm": e.value = e.value == null ? 120 : (e.value >= 300 ? 60 : e.value + 20);
+			case "character":
+				if (characterIds.length == 0) characterIds = ["bf", "dad", "bf-dead"];
+				var ci = characterIds.indexOf(Std.string(e.value));
+				e.value = characterIds[(ci + 1 + characterIds.length) % characterIds.length];
+		}
+		markDirty();
+	}
+	function cycleEventTarget():Void {
+		if (eventIndex < 0 || eventIndex >= events.length) return;
+		pushUndo();
+		events[eventIndex].target = events[eventIndex].target == "player" ? "opponent" : "player";
+		markDirty();
+	}
+	function moveEventHere():Void {
+		if (eventIndex < 0 || eventIndex >= events.length) return;
+		pushUndo();
+		var selected = events[eventIndex];
+		selected.step = Math.max(0, snapRound(curStep()));
+		events.sort(function(a, b) return a.step < b.step ? -1 : (a.step > b.step ? 1 : 0));
+		eventIndex = events.indexOf(selected);
+		markDirty();
+	}
+	function removeEvent():Void {
+		if (eventIndex < 0 || eventIndex >= events.length) return;
+		pushUndo();
+		events.splice(eventIndex, 1);
+		eventIndex = events.length == 0 ? -1 : Std.int(Math.min(eventIndex, events.length - 1));
+		markDirty();
+	}
 	function playSnd(snd:Sound, vol:Float):Void {
 		if (snd != null)
 			FlxG.sound.play(snd, vol);
@@ -757,7 +853,7 @@ class ChartEditorState extends FlxState {
 		modTxt.text = (mod == "" ? "Sem mod ativo (não salva)" : "Mod: " + mod) + "  ·  " + songId;
 		timeTxt.text = fmtTime(curT) + " / " + fmtTime(songLenMs);
 		infoTxt.text = "Passo " + Math.floor(curStep()) + "  ·  Beat " + Math.floor(curStep() / 4) + "  ·  Seção " + (sec + 1) + "\n" + "Notas " + notes.length
-			+ (sel.length > 0 ? "  ·  " + sel.length + " selecionada(s)" : "");
+			+ (sel.length > 0 ? "  ·  " + sel.length + " selecionada(s)" : "") + "  ·  Eventos " + events.length;
 		bpmTxt.text = Std.string(Math.round(bpm * 100) / 100);
 		speedTxt.text = Std.string(Math.round(speed * 10) / 10);
 		snapBtn.txt.text = "Snap 1/" + QUANTS[quantIdx];
@@ -768,14 +864,20 @@ class ChartEditorState extends FlxState {
 		hitBtn.txt.text = onOff(hitOn, "Som ao passar nas notas");
 		voicesBtn.txt.text = onOff(voicesOn, "Vozes");
 		instBtn.txt.text = onOff(instOn, "Instrumental");
+		if (eventIndex >= 0 && eventIndex < events.length) {
+			var ev = events[eventIndex];
+			for (b in btns) if (b.tab == 3 && b.txt != null) {
+				if (b.txt.text.indexOf("Tipo:") == 0) b.txt.text = "Tipo: " + ev.type;
+				if (b.txt.text.indexOf("Valor:") == 0) b.txt.text = "Valor: " + Std.string(ev.value);
+				if (b.txt.text.indexOf("Alvo:") == 0) b.txt.text = "Alvo: " + ev.target;
+			}
+		}
 		metroBtn.act = metroOn;
 		hitBtn.act = hitOn;
 		voicesBtn.act = voicesOn;
 		instBtn.act = instOn;
-		for (i in 0...3) {
-			toolBtns[i].act = tool == i;
-			tabBtns[i].act = rightTab == i;
-		}
+		for (i in 0...3) toolBtns[i].act = tool == i;
+		for (i in 0...4) tabBtns[i].act = rightTab == i;
 		for (b in btns)
 			paintBtn(b);
 	}
@@ -790,7 +892,9 @@ class ChartEditorState extends FlxState {
 		var c:Array<EdNote> = [];
 		for (n in notes)
 			c.push({step: n.step, lane: n.lane, sus: n.sus});
-		return {notes: c, must: must.copy()};
+		var ev:Array<EdEvent> = [];
+		for (e in events) ev.push({step: e.step, type: e.type, value: e.value, target: e.target});
+		return {notes: c, must: must.copy(), events: ev};
 	}
 	function pushUndo():Void {
 		undoS.push(snapshot());
@@ -801,6 +905,8 @@ class ChartEditorState extends FlxState {
 	function restore(s:EdSnap):Void {
 		notes = s.notes;
 		must = s.must;
+		events = s.events;
+		eventIndex = events.length == 0 ? -1 : Std.int(Math.min(eventIndex, events.length - 1));
 		sel = [];
 		markDirty();
 	}
@@ -1331,6 +1437,9 @@ class ChartEditorState extends FlxState {
 			Reflect.setField(out, "bpm", bpm);
 			Reflect.setField(out, "speed", speed);
 			Reflect.setField(out, "notes", secs);
+			events.sort(function(a, b) return a.step < b.step ? -1 : (a.step > b.step ? 1 : 0));
+			Reflect.setField(out, "events", events);
+			Reflect.setField(out, "characters", characterIds);
 
 			var dir = Paths.modsDir() + mod + "/songs/" + songId + "/";
 			if (!Paths.ensureDir(dir))
