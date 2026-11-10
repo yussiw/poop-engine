@@ -6,7 +6,7 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.input.keyboard.FlxKey;
 import flixel.sound.FlxSound;
 import flixel.text.FlxText;
-import flixel.text.FlxTextBorderStyle;
+import flixel.text.FlxText.FlxTextBorderStyle;
 import flixel.util.FlxColor;
 import haxe.Json;
 import openfl.geom.Rectangle;
