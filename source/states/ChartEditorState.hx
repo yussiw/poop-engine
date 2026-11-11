@@ -8,6 +8,7 @@ import flixel.sound.FlxSound;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 import haxe.Json;
+import EventDefs.EvField;
 import openfl.geom.Rectangle;
 import openfl.media.Sound;
 #if sys
