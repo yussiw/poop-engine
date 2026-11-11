@@ -47,6 +47,9 @@ class PlayState extends FlxState {
 	var unspawn:Array<NoteData> = [];
 
 	var unspawnIdx:Int = 0;
+	var songEvents:Array<Dynamic> = [];
+	var eventIdx:Int = 0;
+	var hudEventVisible:Bool = true;
 
 	var killList:Array<Note> = [];
 	var hitbox:Array<FlxSprite> = [];
@@ -67,10 +70,6 @@ class PlayState extends FlxState {
 	var curStep:Int = -9999;
 	public var scripts:Array<Script> = [];
 	var pxMs:Float = 0.9;
-	var baseBpm:Float = 102;
-	var eventCursor:Int = 0;
-	var hudHidden:Bool = false;
-	var cameraEventAtStep:Int = -1;
 
 	override function create():Void {
 		super.create();
@@ -80,15 +79,10 @@ class PlayState extends FlxState {
 			FlxG.sound.music.stop();
 		var chartFile:Dynamic = Paths.json('songs/$songId/chart.json');
 		chart = (chartFile.song != null && !Std.isOfType(chartFile.song, String)) ? chartFile.song : chartFile;
-		if (chart.events != null) {
-			var chartEvents:Array<Dynamic> = chart.events;
-			chartEvents.sort(function(a, b) return (a.step != null ? a.step : 0) < (b.step != null ? b.step : 0) ? -1 : 1);
-		}
 		songName = Std.string(chart.song);
 		speed = chart.speed != null ? chart.speed : 2;
 		pxMs = 0.45 * speed;
-		baseBpm = chart.bpm != null ? chart.bpm : 102;
-		Conductor.setBpm(baseBpm);
+		Conductor.setBpm(chart.bpm);
 		Conductor.songPosition = -Conductor.crochet * 4;
 
 		camHUD = new FlxCamera();
@@ -186,6 +180,7 @@ class PlayState extends FlxState {
 		add(notes);
 		add(splashes);
 		loadNotes();
+		loadEvents();
 
 		var hbBG = healthBarBG = new FlxSprite(0, downscroll ? FlxG.height * 0.1 : FlxG.height * 0.9, Paths.image("game/healthBar"));
 		hbBG.screenCenter(X);
@@ -248,8 +243,82 @@ class PlayState extends FlxState {
 		unspawn.sort(function(a, b) return Std.int(a.t - b.t));
 	}
 
+	function loadEvents():Void {
+		if (chart.events != null) songEvents = cast chart.events; else songEvents = [];
+		songEvents.sort(function(a:Dynamic, b:Dynamic) return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0));
+		eventIdx = 0;
+	}
+	function processSongEvents():Void {
+		while (eventIdx < songEvents.length) {
+			var ev:Dynamic = songEvents[eventIdx];
+			if (ev == null || ev.time > Conductor.songPosition) break;
+			eventIdx++;
+			applySongEvent(ev);
+		}
+	}
+	function applySongEvent(ev:Dynamic):Void {
+		var typ = ev.type != null ? Std.string(ev.type) : "";
+		var v1 = ev.value1 != null ? Std.string(ev.value1) : "";
+		var v2 = ev.value2 != null ? Std.string(ev.value2) : "";
+		switch (typ) {
+			case "Zoom":
+				var z = Std.parseFloat(v1);
+				if (!Math.isNaN(z) && z > 0) { defaultZoom = z; FlxG.camera.zoom = z; }
+			case "Camera Focus":
+				moveCam(v1.toLowerCase() == "player" || v1.toLowerCase() == "jogador");
+			case "Camera Move":
+				var x = Std.parseFloat(v1); var y = Std.parseFloat(v2);
+				if (!Math.isNaN(x) && !Math.isNaN(y)) camFollow.setPosition(x, y);
+			case "HUD Visibility":
+				setHudVisible(v1.toLowerCase() == "true" || v1 == "1" || v1.toLowerCase() == "show", v2);
+			case "BPM Change":
+				var b = Std.parseFloat(v1);
+				if (!Math.isNaN(b) && b > 0) { Conductor.setBpm(b); chart.bpm = b; }
+			case "Character Change":
+				var side = v2.toLowerCase();
+				if (side == "opponent" || side == "dad" || side == "oponente") changeCharacter(false, v1);
+				else changeCharacter(true, v1);
+		}
+		callScript("onEvent", [typ, v1, v2]);
+	}
+	function setHudVisible(show:Bool, target:String = "all"):Void {
+		var all = target == null || target == "" || target == "all";
+		if (all) hudEventVisible = show;
+		if (all || target == "health") for (s in [healthBarBG, healthBar, iconP1, iconP2]) if (s != null) s.visible = show;
+		if (all || target == "score") for (s in [scoreTxt, watermark]) if (s != null) s.visible = show;
+		if (all || target == "strums") {
+			for (s in playerStrums) s.visible = show;
+			for (s in oppStrums) s.visible = show;
+		}
+		if (all || target == "notes") {
+			if (notes != null) notes.visible = show;
+			if (sustains != null) sustains.visible = show;
+			if (splashes != null) splashes.visible = show;
+		}
+	}
+	function changeCharacter(player:Bool, id:String):Void {
+		if (id == null || id == "") return;
+		if (player) {
+			var x = bf.x; var y = bf.y; var iconVisible = iconP1 == null ? true : iconP1.visible;
+			remove(bf, true); bf.destroy();
+			bf = new Character(x, y, id, true); add(bf);
+			chart.player1 = id;
+			if (iconP1 != null) { remove(iconP1, true); iconP1.destroy(); }
+			iconP1 = new HealthIcon(bf.icon, true); iconP1.cameras = [camHUD]; iconP1.visible = iconVisible; add(iconP1);
+		} else {
+			var x = dad.x; var y = dad.y; var iconVisible = iconP2 == null ? true : iconP2.visible;
+			remove(dad, true); dad.destroy();
+			dad = new Character(x, y, id, false); add(dad);
+			chart.player2 = id;
+			if (iconP2 != null) { remove(iconP2, true); iconP2.destroy(); }
+			iconP2 = new HealthIcon(dad.icon, false); iconP2.cameras = [camHUD]; iconP2.visible = iconVisible; add(iconP2);
+		}
+		moveCam(player);
+	}
+
 	function startSong():Void {
 		started = true;
+		eventIdx = 0;
 		Conductor.songPosition = 0;
 		inst.play();
 		if (voices != null)
@@ -308,7 +377,7 @@ class PlayState extends FlxState {
 				voices.time = inst.time;
 		}
 
-		processChartEvents();
+		processSongEvents();
 		var step = Math.floor(Conductor.songPosition / Conductor.stepCrochet);
 		if (step != curStep) {
 			curStep = step;
@@ -346,81 +415,8 @@ class PlayState extends FlxState {
 		}
 	}
 
-	function processChartEvents():Void {
-		var list:Array<Dynamic> = chart.events != null ? chart.events : [];
-		while (eventCursor < list.length) {
-			var e = list[eventCursor];
-			var atStep:Float = e.step != null ? e.step : 0;
-			var atMs = atStep * 60000 / baseBpm / 4;
-			if (Conductor.songPosition + 0.5 < atMs) break;
-			eventCursor++;
-			applyChartEvent(e);
-		}
-	}
-	function applyChartEvent(e:Dynamic):Void {
-		var value:Dynamic = e.value;
-		switch (Std.string(e.type)) {
-			case "zoom":
-				defaultZoom = value != null ? value : 0.9;
-				FlxG.camera.zoom = defaultZoom;
-			case "camera":
-				cameraEventAtStep = e.step != null ? Std.int(Math.round(e.step)) : -1;
-				moveCam(Std.string(value) != "opponent");
-			case "hud":
-				setHudVisible(value == true);
-			case "bpm":
-				if (value != null && value >= 20 && value <= 400) {
-					Conductor.setBpm(value);
-					callScript("onBPMChange", [value]);
-				}
-			case "character":
-				swapSongCharacter(e.target != null ? Std.string(e.target) : "player", Std.string(value));
-		}
-		callScript("onChartEvent", [e]);
-	}
-	function setHudVisible(show:Bool):Void {
-		hudHidden = !show;
-		var a:Float = show ? 1 : 0;
-		if (healthBarBG != null) healthBarBG.alpha = a;
-		if (healthBar != null) healthBar.alpha = a;
-		if (iconP1 != null) iconP1.alpha = a;
-		if (iconP2 != null) iconP2.alpha = a;
-		if (scoreTxt != null) scoreTxt.alpha = a;
-		if (watermark != null) watermark.alpha = a;
-		for (s in playerStrums) s.alpha = a;
-		for (s in oppStrums) s.alpha = a;
-		if (notes != null) for (n in notes.members) if (n != null) n.alpha = a;
-		if (sustains != null) for (s in sustains.members) if (s != null) s.alpha = a;
-		if (splashes != null) for (s in splashes.members) if (s != null) s.alpha = a;
-	}
-	function swapSongCharacter(target:String, id:String):Void {
-		if (id == null || id.length == 0) return;
-		var isPlayer = target == "player";
-		var old:Character = isPlayer ? bf : dad;
-		var replacement = new Character(old.x, old.y, id, isPlayer);
-		replacement.scrollFactor.set(old.scrollFactor.x, old.scrollFactor.y);
-		remove(old, true);
-		old.destroy();
-		add(replacement);
-		if (isPlayer) {
-			bf = replacement;
-			var oldIcon = iconP1;
-			iconP1 = new HealthIcon(bf.icon, true);
-			iconP1.cameras = [camHUD];
-			remove(oldIcon, true);
-			add(iconP1);
-		} else {
-			dad = replacement;
-			var oldIcon = iconP2;
-			iconP2 = new HealthIcon(dad.icon, false);
-			iconP2.cameras = [camHUD];
-			remove(oldIcon, true);
-			add(iconP2);
-		}
-		if (hudHidden) setHudVisible(false);
-	}
 	function stepHit(s:Int):Void {
-		if (s >= 0 && s % 16 == 0 && s != cameraEventAtStep)
+		if (s >= 0 && s % 16 == 0)
 			moveCam(sectionMustHit(Std.int(s / 16)));
 		callScript("onStepHit", [s]);
 	}
@@ -599,7 +595,7 @@ class PlayState extends FlxState {
 			if (!n.wasHit)
 				n.y = strum.y + (n.strumTime - Conductor.songPosition) * pxMs * (downscroll ? -1 : 1);
 			n.visible = !n.wasHit;
-			n.alpha = hudHidden ? 0 : (n.tooLate ? 0.35 : 1);
+			n.alpha = n.tooLate ? 0.35 : 1;
 
 			if (!n.mustPress && !n.wasHit && n.strumTime <= Conductor.songPosition)
 				opponentHit(n);

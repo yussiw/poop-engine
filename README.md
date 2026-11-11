@@ -15,7 +15,7 @@ Features
 - Gesture Navigation – Swipe to navigate menus and select options.
 - Mod Support – Load external mods with custom songs, characters, stages, scripts and more.
 - HScript Support – Customize gameplay and menus without recompiling the engine.
-- Chart Editor – Create and edit charts directly in the game, including timeline events and character changes.
+- Chart Editor – Create and edit charts directly in the game.
 - Custom HUDs – Replace or modify gameplay elements through scripts.
 - Shaders – Support for custom GLSL shaders.
 - Options Menu – Gameplay, graphics, interface, controls, language and update settings.
@@ -74,28 +74,6 @@ The engine includes a built-in chart editor with a timeline-based layout.
 
 It supports note placement, sustain notes, selection tools, snapping, zoom, audio playback, BPM settings and section camera control.
 
-The Events tab lets you add events at the current playhead position, browse them, change their type/value/target, move them to the playhead and remove them. Supported event types:
-
-- `zoom` – Change the gameplay camera zoom.
-- `camera` – Focus the camera on the player or opponent.
-- `hud` – Show or hide the HUD.
-- `bpm` – Change the BPM during the song.
-- `character` – Change the active player-side or opponent-side character.
-
-Charts can include a `characters` array containing every character ID used by the song. Character events select an ID from this list (the editor also discovers character JSON files from the active mod and built-in assets). Event entries use `step`, `type`, `value` and `target`, for example:
-
-```json
-{
-  "characters": ["bf", "dad", "bf-dead"],
-  "events": [
-    {"step": 64, "type": "zoom", "value": 1.2, "target": "player"},
-    {"step": 128, "type": "character", "value": "bf-dead", "target": "player"},
-    {"step": 192, "type": "bpm", "value": 150, "target": "player"},
-    {"step": 256, "type": "hud", "value": false, "target": "player"}
-  ]
-}
-```
-
 Charts are saved in the Kade / Vanilla format, making them compatible with the engine's chart system.
 
 Updates
@@ -115,10 +93,3 @@ Credits
 Development Status
 
 Poop Engine is still a work in progress. Features and systems may change as development continues.
-
-## Chart Editor — personagens e eventos
-
-- Toque no ícone do Jogador ou do Oponente no topo para abrir a seleção de personagem.
-- Use “Adicionar” no seletor para incluir personagens disponíveis no elenco da música.
-- Os eventos aparecem na grade como linhas coloridas com o tipo e o step; toque na linha para selecionar e abrir a aba Eventos.
-- A aba Eventos usa texto compacto para evitar que a descrição cubra os controles.
