@@ -14,7 +14,9 @@ import openfl.media.Sound;
 import sys.io.File;
 #end
 
-typedef EdNote = {step:Float, lane:Int, sus:Float};
+typedef EdNote = {step:Float, lane:Int, sus:Float, ch:Int};
+typedef EdEvent = {step:Float, name:String, v1:String, v2:String};
+typedef EdSlot = {id:String, dx:Float, dy:Float};
 
 typedef EdBtn = {
 	spr:FlxSprite,
@@ -32,10 +34,9 @@ typedef EdBtn = {
 };
 typedef EdTabText = {t:FlxText, tab:Int};
 typedef EdPool = {arr:Array<FlxSprite>, grp:FlxTypedGroup<FlxSprite>, n:Int};
-typedef EdEvent = {time:Float, type:String, value1:String, value2:String};
-typedef EdSnap = {notes:Array<EdNote>, must:Array<Bool>, events:Array<EdEvent>};
-typedef EdExtra = {t:Float, arr:Array<Dynamic>};
-typedef EdClip = {d:Float, lane:Int, sus:Float};
+typedef EdSnap = {notes:Array<EdNote>, must:Array<Bool>, events:Array<EdEvent>, slots:Array<EdSlot>};
+typedef EdExtra = {step:Float, arr:Array<Dynamic>};
+typedef EdClip = {d:Float, lane:Int, sus:Float, ch:Int};
 class ChartEditorState extends FlxState {
 	public static var songId:String = "demo";
 	public static var isNew:Bool = false;
@@ -56,6 +57,7 @@ class ChartEditorState extends FlxState {
 	static inline var RW:Int = 252;
 	static inline var SEEK_X:Int = 1232;
 	static inline var SEEK_W:Int = 28;
+	static inline var EVW:Int = 34;
 	static inline var C_BG:Int = 0xFF0E0F13;
 	static inline var C_PANEL:Int = 0xFF15161B;
 	static inline var C_BTN:Int = 0xFF1F2128;
@@ -67,7 +69,9 @@ class ChartEditorState extends FlxState {
 	static inline var C_SEL:Int = 0x66FFD84D;
 
 	static final LANE_COLORS:Array<Int> = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
+	static final SLOT_COLORS:Array<Int> = [0xFFFF7B72, 0xFF4C8DFF, 0xFFFFD84D, 0xFF3FB950, 0xFFD2A8FF, 0xFFFFA657, 0xFF39C5CF, 0xFFF778BA];
 	static final QUANTS:Array<Int> = [4, 8, 12, 16, 24, 32, 48, 64];
+	static var lastEvType:String = "Camera Zoom";
 	static final ZOOMS:Array<Float> = [0.75, 1.0, 1.25, 1.5];
 	static final NUM_KEYS:Array<FlxKey> = [FlxKey.ONE, FlxKey.TWO, FlxKey.THREE, FlxKey.FOUR, FlxKey.FIVE, FlxKey.SIX, FlxKey.SEVEN, FlxKey.EIGHT];
 
@@ -78,13 +82,28 @@ class ChartEditorState extends FlxState {
 	var notes:Array<EdNote> = [];
 	var extras:Array<EdExtra> = [];
 	var events:Array<EdEvent> = [];
-	var selectedEvent:Int = -1;
-	var eventTypeIndex:Int = 0;
-	var eventTypeBtn:EdBtn;
-	var eventValue1Btn:EdBtn;
-	var eventValue2Btn:EdBtn;
-	var eventInfoTxt:FlxText;
-	static final EVENT_TYPES:Array<String> = ["Zoom", "Camera Focus", "Camera Move", "HUD Visibility", "BPM Change", "Character Change"];
+	var selEv:EdEvent = null;
+	var slots:Array<EdSlot> = [];
+	var selSlot:Int = 0;
+	var segS:Array<Float> = [0];
+	var segMs:Array<Float> = [0];
+	var segB:Array<Float> = [102];
+	var tagPool:EdPool;
+	var evPool:EdPool;
+	var evTexts:Array<FlxText> = [];
+	var evTextN:Int = 0;
+	var evTxtGrp:FlxTypedGroup<FlxText>;
+	var evInfoTxt:FlxText;
+	var evL1:FlxText;
+	var evL2:FlxText;
+	var evTypeBtn:EdBtn;
+	var evV1:EdBtn;
+	var evV2:EdBtn;
+	var slotBtn:EdBtn;
+	var charBtn:EdBtn;
+	var dxBtn:EdBtn;
+	var dyBtn:EdBtn;
+	var slotSwatch:FlxSprite;
 	var must:Array<Bool> = [true];
 	var sel:Array<EdNote> = [];
 	var clip:Array<EdClip> = [];
@@ -204,6 +223,10 @@ class ChartEditorState extends FlxState {
 		}
 		headGrp = new FlxTypedGroup<FlxSprite>();
 		add(headGrp);
+		tagPool = mkPool();
+		evPool = mkPool();
+		evTxtGrp = new FlxTypedGroup<FlxText>();
+		add(evTxtGrp);
 		for (i in 0...8) {
 			heads.push([]);
 			headN.push(0);
@@ -246,20 +269,50 @@ class ChartEditorState extends FlxState {
 		songName = songObj.song != null ? Std.string(songObj.song) : songId;
 		bpm = songObj.bpm != null ? songObj.bpm : 102;
 		speed = songObj.speed != null ? songObj.speed : 2;
-		var sc = stepMs();
+
+		slots = [
+			{id: songObj.player2 != null ? Std.string(songObj.player2) : "dad", dx: 0, dy: 0},
+			{id: songObj.player1 != null ? Std.string(songObj.player1) : "bf", dx: 0, dy: 0}
+		];
+		var exl:Array<Dynamic> = songObj.chars != null ? songObj.chars : [];
+		for (c in exl) {
+			var cdx:Float = c.dx != null ? c.dx : 0;
+			var cdy:Float = c.dy != null ? c.dy : 0;
+			slots.push({id: Std.string(c.id), dx: cdx, dy: cdy});
+		}
+		selSlot = 0;
+		selEv = null;
+
+		var rawEv:Array<Dynamic> = songObj.events != null ? songObj.events : [];
+		var bs:Array<Dynamic> = rawEv.filter(function(e:Dynamic) return Std.string(e.e) == "Change BPM");
+		bs.sort(function(a:Dynamic, b:Dynamic) return a.t < b.t ? -1 : (a.t > b.t ? 1 : 0));
+		segS = [0];
+		segMs = [0];
+		segB = [bpm];
+		for (e in bs) {
+			var nb = Std.parseFloat(Std.string(e.v1));
+			if (Math.isNaN(nb) || nb <= 0)
+				continue;
+			var et:Float = e.t;
+			var i = segS.length - 1;
+			if (et <= segMs[i])
+				segB[i] = nb;
+			else {
+				segS.push(segS[i] + (et - segMs[i]) * segB[i] / 15000);
+				segMs.push(et);
+				segB.push(nb);
+			}
+		}
+		events = [];
+		for (e in rawEv) {
+			var et2:Float = e.t;
+			events.push({step: stepOfMs(et2), name: Std.string(e.e), v1: e.v1 != null ? Std.string(e.v1) : "", v2: e.v2 != null ? Std.string(e.v2) : ""});
+		}
+		sortEvents();
 
 		must = [];
 		notes = [];
 		extras = [];
-		events = [];
-		selectedEvent = -1;
-		if (songObj.events != null) {
-			var savedEvents:Array<Dynamic> = cast songObj.events;
-			for (ev in savedEvents) {
-				if (ev == null) continue;
-				events.push({time: ev.time != null ? ev.time : 0, type: ev.type != null ? Std.string(ev.type) : "Zoom", value1: ev.value1 != null ? Std.string(ev.value1) : "1.0", value2: ev.value2 != null ? Std.string(ev.value2) : ""});
-			}
-		}
 		var secs:Array<Dynamic> = songObj.notes != null ? songObj.notes : [];
 		for (sec in secs) {
 			var m:Bool = sec.mustHitSection == true;
@@ -268,18 +321,23 @@ class ChartEditorState extends FlxState {
 			if (sn == null)
 				continue;
 			for (n in sn) {
-				var lane = Std.int(n[1]);
+				var na:Array<Dynamic> = n;
+				var t:Float = na[0];
+				var st = stepOfMs(t);
+				var lane = Std.int(na[1]);
 				if (lane < 0 || lane > 7) {
-					extras.push({t: n[0], arr: n});
+					extras.push({step: st, arr: na});
 					continue;
 				}
 				var isP = lane < 4 ? m : !m;
-				var sus:Float = (n[2] != null && n[2] > 0) ? n[2] / sc : 0;
-				notes.push({step: n[0] / sc, lane: (isP ? 4 : 0) + lane % 4, sus: sus});
+				var sus:Float = (na[2] != null && na[2] > 0) ? stepOfMs(t + na[2]) - st : 0;
+				var ch:Int = (na.length > 3 && na[3] != null) ? Std.int(na[3]) : -1;
+				notes.push({step: st, lane: (isP ? 4 : 0) + lane % 4, sus: sus, ch: ch});
 			}
 		}
 		if (must.length == 0)
 			must.push(true);
+		rebuildSegs();
 	}
 	function stepMs():Float
 		return 60000 / bpm / 4;
@@ -290,7 +348,45 @@ class ChartEditorState extends FlxState {
 		return STEPS / QUANTS[quantIdx];
 
 	function curStep():Float
-		return curT / stepMs();
+		return stepOfMs(curT);
+
+	function msOfStep(st:Float):Float {
+		var i = segS.length - 1;
+		while (i > 0 && segS[i] > st)
+			i--;
+		return segMs[i] + (st - segS[i]) * 15000 / segB[i];
+	}
+
+	function stepOfMs(t:Float):Float {
+		var i = segMs.length - 1;
+		while (i > 0 && segMs[i] > t)
+			i--;
+		return segS[i] + (t - segMs[i]) * segB[i] / 15000;
+	}
+
+	function sortEvents():Void
+		events.sort(function(a:EdEvent, b:EdEvent) return a.step < b.step ? -1 : (a.step > b.step ? 1 : 0));
+
+	function rebuildSegs():Void {
+		segS = [0];
+		segMs = [0];
+		segB = [bpm];
+		var bs = events.filter(function(e:EdEvent) return e.name == "Change BPM");
+		bs.sort(function(a:EdEvent, b:EdEvent) return a.step < b.step ? -1 : (a.step > b.step ? 1 : 0));
+		for (e in bs) {
+			var nb = Std.parseFloat(e.v1);
+			if (Math.isNaN(nb) || nb <= 0)
+				continue;
+			var i = segS.length - 1;
+			if (e.step <= segS[i])
+				segB[i] = nb;
+			else {
+				segMs.push(segMs[i] + (e.step - segS[i]) * 15000 / segB[i]);
+				segS.push(e.step);
+				segB.push(nb);
+			}
+		}
+	}
 	function yOfStep(s:Float):Float
 		return PH + (s - curStep()) * stepH();
 
@@ -475,6 +571,7 @@ class ChartEditorState extends FlxState {
 			camTexts[i].visible = false;
 		poolBegin(ringPool);
 		poolBegin(susPool);
+		poolBegin(tagPool);
 		for (i in 0...8)
 			headN[i] = 0;
 		var size = cw - 2;
@@ -494,28 +591,48 @@ class ChartEditorState extends FlxState {
 			}
 			if (sel.indexOf(n) >= 0)
 				poolRect(ringPool, gx + n.lane * cw, y, cw, cw, C_SEL);
+			if (n.ch >= 0)
+				poolRect(tagPool, gx + n.lane * cw + 1, y + 1, 10, 10, SLOT_COLORS[n.ch % SLOT_COLORS.length]);
 			var hd = getHead(n.lane);
 			var k = size / hd.frameWidth;
 			hd.scale.set(k, k);
 			hd.updateHitbox();
 			hd.setPosition(cx - hd.width / 2, cy - hd.height / 2);
 		}
-		for (i in 0...events.length) {
-			var ev = events[i];
-			var y = yOfStep(ev.time / stepMs());
-			if (y >= GY0 - 12 && y <= GY0 + GH + 12) {
-				var color = i == selectedEvent ? 0xFFFFFF55 : 0xFFFF9B42;
-				poolRect(ringPool, gx + 8 * cw - 13, y - 5, 12, 10, color);
-				poolRect(ringPool, gx + 8 * cw - 18, y - 1, 4, 2, color);
-			}
-		}
 		poolEnd(ringPool);
 		poolEnd(susPool);
+		poolEnd(tagPool);
 		for (l in 0...8)
 			for (i in headN[l]...heads[l].length)
 				heads[l][i].visible = false;
-		var topT = topStep * stepMs();
-		var spanT = (GH / sh) * stepMs();
+		poolBegin(evPool);
+		evTextN = 0;
+		var ebh = Math.max(14, Math.min(cw - 4, 24));
+		var exx = gx + 8 * cw + 4;
+		var stacks:Map<Int, Int> = new Map();
+		for (ev in events) {
+			var ek = Math.round(ev.step * 100);
+			var kk = stacks.exists(ek) ? stacks.get(ek) : 0;
+			stacks.set(ek, kk + 1);
+			var ey = yOfStep(ev.step) + kk * (ebh + 1);
+			if (ey + ebh < GY0 - 4 || ey > GY0 + GH + 4)
+				continue;
+			var ed = EventDefs.get(ev.name);
+			var ecol:Int = ed != null ? ed.color : 0xFF888888;
+			if (kk == 0)
+				poolRect(evPool, gx, yOfStep(ev.step) - 1, gw, 2, (ecol & 0xFFFFFF) | 0x66000000);
+			if (ev == selEv)
+				poolRect(evPool, exx - 2, ey - 2, EVW + 4, ebh + 4, 0xFFFFD84D);
+			poolRect(evPool, exx, ey, EVW, ebh, ecol);
+			var et = getEvText();
+			et.text = ed != null ? ed.short : "?";
+			et.setPosition(exx, ey + (ebh - et.height) / 2);
+		}
+		poolEnd(evPool);
+		for (i in evTextN...evTexts.length)
+			evTexts[i].visible = false;
+		var topT = msOfStep(topStep);
+		var spanT = msOfStep(botStep) - topT;
 		viewMark.setGraphicSize(SEEK_W - 2, Math.max(4, spanT / songLenMs * GH));
 		viewMark.updateHitbox();
 		viewMark.setPosition(SEEK_X + 1, GY0 + Math.max(0, Math.min(1, topT / songLenMs)) * GH);
@@ -525,14 +642,15 @@ class ChartEditorState extends FlxState {
 		var lastMs = 0.0;
 		var sm = stepMs();
 		for (n in notes)
-			lastMs = Math.max(lastMs, (n.step + n.sus) * sm);
-		for (ev in events) lastMs = Math.max(lastMs, ev.time);
+			lastMs = Math.max(lastMs, msOfStep(n.step + n.sus));
+		for (e in events)
+			lastMs = Math.max(lastMs, msOfStep(e.step));
 		var len = inst != null ? inst.length : 0;
 		songLenMs = Math.max(Math.max(len, lastMs + STEPS * sm * 2), STEPS * sm * 4);
 		var bd = mini.pixels;
 		bd.fillRect(new Rectangle(0, 0, bd.width, bd.height), C_PANEL);
 		for (n in notes) {
-			var y = Std.int(Math.min(GH - 2, n.step * sm / songLenMs * GH));
+			var y = Std.int(Math.min(GH - 2, msOfStep(n.step) / songLenMs * GH));
 			bd.fillRect(new Rectangle(2 + n.lane * 3, y, 2, 2), LANE_COLORS[n.lane % 4]);
 		}
 		mini.dirty = true;
@@ -605,7 +723,7 @@ class ChartEditorState extends FlxState {
 		titleTxt = label(64, 8, 300, 16, C_TEXT, FlxTextAlign.LEFT);
 		modTxt = label(64, 30, 300, 11, C_MUTED, FlxTextAlign.LEFT);
 		var names = ["Oponente", "Jogador"];
-		var ids = [songObj.player2, songObj.player1];
+		var ids = [slots[0].id, slots[1].id];
 		for (i in 0...2) {
 			var ic = new HealthIcon(charIcon(ids[i]), false);
 			ic.setGraphicSize(32, 32);
@@ -663,14 +781,13 @@ class ChartEditorState extends FlxState {
 					moveSel(0, mi == 2 ? -1 : 1);
 			}, 0, 17), function() return sel.length > 0);
 		}
-		label(LX, 590, LW, 12, C_MUTED, FlxTextAlign.LEFT).text = "Toque: põe/tira nota\nArraste a nota para baixo: sustain\nArraste no vazio: rolar a grade\nToque na faixa à esquerda: foco da câmera";
+		label(LX, 590, LW, 12, C_MUTED, FlxTextAlign.LEFT).text = "Toque: põe/tira nota\nArraste a nota para baixo: sustain\nArraste no vazio: rolar a grade\nToque na faixa à esquerda: foco da câmera\nToque na faixa à direita: eventos";
 
-		var tw = (RW - 16) / 3;
-		var tabNames = ["Seção", "Áudio", "Música", "Eventos"];
-		var tw4 = (RW - 24) / 4;
+		var tw = (RW - 24) / 4;
+		var tabNames = ["Seção", "Música", "Eventos", "Elenco"];
 		for (i in 0...4) {
 			var ti = i;
-			tabBtns.push(mk(RX + i * (tw4 + 8), 68, tw4, 36, tabNames[i], function() setRightTab(ti), 3));
+			tabBtns.push(mk(RX + i * (tw + 8), 68, tw, 36, tabNames[i], function() setRightTab(ti), 3, 12));
 		}
 		focusBtn = mk(RX, 120, RW, 44, "", toggleFocusHere, 0, 15, 0);
 		enableWhen(mk(RX, 172, RW, 40, "Copiar da seção anterior", copyPrev, 0, 15, 0), function() return curSection() > 0);
@@ -678,50 +795,72 @@ class ChartEditorState extends FlxState {
 		mk(RX, 268, RW, 40, "Limpar seção", clearSection, 2, 15, 0);
 		label(RX, 326, RW, 12, C_MUTED, FlxTextAlign.LEFT, 0).text = "A faixa colorida à esquerda da grade mostra para quem a câmera aponta em cada seção (azul = jogador, rosa = oponente). As notas não mudam de lado.";
 
-		metroBtn = mk(RX, 120, RW, 40, "", function() {
+		metroBtn = mk(RX, 352, RW, 40, "", function() {
 			metroOn = !metroOn;
 		}, 4, 15, 1);
-		hitBtn = mk(RX, 168, RW, 40, "", function() {
+		hitBtn = mk(RX, 400, RW, 40, "", function() {
 			hitOn = !hitOn;
 		}, 4, 15, 1);
-		voicesBtn = mk(RX, 216, RW, 40, "", function() {
+		voicesBtn = mk(RX, 448, RW, 40, "", function() {
 			voicesOn = !voicesOn;
 			applyVolumes();
 		}, 4, 15, 1);
-		instBtn = mk(RX, 264, RW, 40, "", function() {
+		instBtn = mk(RX, 496, RW, 40, "", function() {
 			instOn = !instOn;
 			applyVolumes();
 		}, 4, 15, 1);
 
-		label(RX, 120, RW, 11, C_MUTED, FlxTextAlign.LEFT, 2).text = "BPM";
-		bpmTxt = label(RX, 138, RW, 26, C_TEXT, FlxTextAlign.LEFT, 2);
+		label(RX, 120, RW, 11, C_MUTED, FlxTextAlign.LEFT, 1).text = "BPM";
+		bpmTxt = label(RX, 138, RW, 26, C_TEXT, FlxTextAlign.LEFT, 1);
 		var q4 = (RW - 24) / 4;
 		var bd = [-10, -1, 1, 10];
 		var bl = ["−10", "−1", "+1", "+10"];
 		for (i in 0...4) {
 			var v = bd[i];
-			mk(RX + i * (q4 + 8), 176, q4, 36, bl[i], function() changeBpm(v), 0, 14, 2);
+			mk(RX + i * (q4 + 8), 176, q4, 36, bl[i], function() changeBpm(v), 0, 14, 1);
 		}
-		label(RX, 236, RW, 11, C_MUTED, FlxTextAlign.LEFT, 2).text = "VELOCIDADE";
-		speedTxt = label(RX, 254, RW, 26, C_TEXT, FlxTextAlign.LEFT, 2);
+		label(RX, 236, RW, 11, C_MUTED, FlxTextAlign.LEFT, 1).text = "VELOCIDADE";
+		speedTxt = label(RX, 254, RW, 26, C_TEXT, FlxTextAlign.LEFT, 1);
 		var h2 = (RW - 8) / 2;
-		mk(RX, 292, h2, 36, "−", function() changeSpeed(-0.1), 0, 17, 2);
-		mk(RX + h2 + 8, 292, h2, 36, "+", function() changeSpeed(0.1), 0, 17, 2);
+		mk(RX, 292, h2, 36, "−", function() changeSpeed(-0.1), 0, 17, 1);
+		mk(RX + h2 + 8, 292, h2, 36, "+", function() changeSpeed(0.1), 0, 17, 1);
+		label(RX, 334, RW, 11, C_MUTED, FlxTextAlign.LEFT, 1).text = "ÁUDIO";
 
-		label(RX, 122, RW, 12, C_MUTED, FlxTextAlign.LEFT, 3).text = "EVENTO NA POSIÇÃO ATUAL";
-		mk(RX, 144, RW, 38, "+ Adicionar evento", addEvent, 1, 15, 3);
-		eventInfoTxt = label(RX, 190, RW, 42, C_TEXT, FlxTextAlign.LEFT, 3);
-		eventTypeBtn = mk(RX, 238, RW, 38, "Tipo: Zoom", cycleEventType, 0, 14, 3);
-		eventValue1Btn = mk(RX, 284, RW, 38, "Valor 1: 1.0", function() changeEventValue(1), 0, 14, 3);
-		eventValue2Btn = mk(RX, 330, RW, 38, "Valor 2: —", function() changeEventValue(2), 0, 14, 3);
-		var eh = (RW - 8) / 2;
-		enableWhen(mk(RX, 378, eh, 38, "‹ Anterior", function() selectEvent(-1), 0, 14, 3), function() return events.length > 0);
-		enableWhen(mk(RX + eh + 8, 378, eh, 38, "Próximo ›", function() selectEvent(1), 0, 14, 3), function() return events.length > 0);
-		enableWhen(mk(RX, 424, RW, 38, "Excluir evento", deleteEvent, 2, 14, 3), function() return selectedEvent >= 0 && selectedEvent < events.length);
-		var emw = (RW - 8) / 2;
-		enableWhen(mk(RX, 470, emw, 38, "− 1 passo", function() moveSelectedEvent(-1), 0, 13, 3), function() return selectedEvent >= 0);
-		enableWhen(mk(RX + emw + 8, 470, emw, 38, "+ 1 passo", function() moveSelectedEvent(1), 0, 13, 3), function() return selectedEvent >= 0);
-		label(RX, 520, RW, 70, C_MUTED, FlxTextAlign.LEFT, 3).text = "Eventos aparecem na grade na posição musical exata. Selecione, altere o tipo e os valores, mova em passos ou exclua.";
+		// ---- aba Eventos ----
+		evInfoTxt = label(RX, 120, RW, 12, C_TEXT, FlxTextAlign.LEFT, 2);
+		var hasEv = function() return selEv != null;
+		mk(RX, 164, 64, 40, "‹ Ev.", function() evNav(-1), 0, 13, 2);
+		mk(RX + 70, 164, 112, 40, "+ Adicionar", function() addEventAt(snapRound(curStep())), 1, 14, 2);
+		mk(RX + 188, 164, 64, 40, "Ev. ›", function() evNav(1), 0, 13, 2);
+		label(RX, 214, RW, 11, C_MUTED, FlxTextAlign.LEFT, 2).text = "TIPO";
+		evTypeBtn = triRow(230, 2, function() evCycleType(-1), function() evCycleType(1), hasEv);
+		evL1 = label(RX, 278, RW, 11, C_MUTED, FlxTextAlign.LEFT, 2);
+		evV1 = evRow(294, 1);
+		evL2 = label(RX, 342, RW, 11, C_MUTED, FlxTextAlign.LEFT, 2);
+		evV2 = evRow(358, 2);
+		var half2 = (RW - 8) / 2;
+		enableWhen(mk(RX, 406, half2, 36, "Mover ↑", function() evMove(-1), 0, 14, 2), hasEv);
+		enableWhen(mk(RX + half2 + 8, 406, half2, 36, "Mover ↓", function() evMove(1), 0, 14, 2), hasEv);
+		enableWhen(mk(RX, 452, RW, 40, "Apagar evento", deleteEv, 2, 15, 2), hasEv);
+		label(RX, 506, RW, 11, C_MUTED, FlxTextAlign.LEFT, 2).text = "Toque na faixa colorida à direita da grade: seleciona um evento ou cria um novo naquele passo. Em scripts .hx use onEvent(nome, v1, v2) para eventos próprios.";
+
+		// ---- aba Elenco ----
+		label(RX, 120, RW, 11, C_MUTED, FlxTextAlign.LEFT, 3).text = "SLOT (cor = marca no canto da nota)";
+		slotSwatch = panel(RX + RW - 20, 119, 20, 12, 0xFFFFFFFF);
+		slotBtn = triRow(136, 3, function() castStepSlot(-1), function() castStepSlot(1));
+		label(RX, 184, RW, 11, C_MUTED, FlxTextAlign.LEFT, 3).text = "PERSONAGEM DO SLOT";
+		charBtn = triRow(200, 3, function() castStepChar(-1), function() castStepChar(1));
+		var isExtra = function() return selSlot >= 2;
+		label(RX, 248, RW, 11, C_MUTED, FlxTextAlign.LEFT, 3).text = "POSIÇÃO X / Y (só extras)";
+		dxBtn = triRow(264, 3, function() castMove(0, -20), function() castMove(0, 20), isExtra);
+		dyBtn = triRow(308, 3, function() castMove(1, -20), function() castMove(1, 20), isExtra);
+		enableWhen(mk(RX, 356, RW, 40, "+ Adicionar personagem", castAdd, 1, 14, 3), function() return slots.length < 8);
+		enableWhen(mk(RX, 402, RW, 40, "Remover este slot", castRemove, 2, 14, 3), isExtra);
+		label(RX, 454, RW, 11, C_MUTED, FlxTextAlign.LEFT, 3).text = "QUEM CANTA AS NOTAS";
+		enableWhen(mk(RX, 472, RW, 36, "Atribuir às selecionadas", function() assignNotes(sel, selSlot), 0, 13, 3), function() return sel.length > 0);
+		mk(RX, 514, RW, 36, "Atribuir à seção atual", function() assignNotes(notesInSection(curSection()), selSlot), 0, 13, 3);
+		enableWhen(mk(RX, 556, RW, 36, "Voltar ao padrão (seleção)", function() assignNotes(sel, -1), 0, 13, 3), function() return sel.length > 0);
+		label(RX, 604, RW, 11, C_MUTED, FlxTextAlign.LEFT, 3).text = "Sem atribuição a nota usa o Oponente/Jogador do lado dela. Troca no meio da música: evento Trocar personagem.";
 		setRightTab(rightTab);
 
 		mini = new FlxSprite(SEEK_X, GY0).makeGraphic(SEEK_W, GH, C_PANEL, true);
@@ -740,104 +879,8 @@ class ChartEditorState extends FlxState {
 				b.on = b.tab == i;
 		for (t in tabTexts)
 			t.t.visible = t.tab == i;
-	}
-
-	function addEvent():Void {
-		pushUndo();
-		var type = EVENT_TYPES[eventTypeIndex];
-		var ev:EdEvent = {time: curT, type: type, value1: defaultEventValue(type), value2: (type == "Character Change" ? "player" : (type == "HUD Visibility" ? "all" : (type == "Camera Move" ? "0" : "")))};
-		events.push(ev);
-		events.sort(function(a, b) return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0));
-		selectedEvent = events.indexOf(ev);
-		markDirty();
-		setStatus("Evento criado em " + fmtTime(curT));
-	}
-	function availableCharacters():Array<String> {
-		var out:Array<String> = [];
-		for (path in Paths.list("data/characters", "json")) {
-			var id = path.substr("data/characters/".length);
-			if (StringTools.endsWith(id, ".json")) id = id.substr(0, id.length - 5);
-			if (out.indexOf(id) < 0) out.push(id);
-		}
-		if (out.indexOf("bf") < 0) out.push("bf");
-		return out;
-	}
-	function defaultEventValue(t:String):String {
-		switch (t) {
-			case "Zoom": return "1.1";
-			case "Camera Focus": return "player";
-			case "Camera Move": return "0";
-			case "HUD Visibility": return "true";
-			case "BPM Change": return Std.string(bpm);
-			case "Character Change": return "bf";
-		}
-		return "";
-	}
-	function updateEventUi():Void {
-		if (eventInfoTxt == null || eventTypeBtn == null) return;
-		var ev:EdEvent = selectedEvent >= 0 && selectedEvent < events.length ? events[selectedEvent] : null;
-		if (ev == null) {
-			eventInfoTxt.text = events.length == 0 ? "Nenhum evento criado." : "Nenhum evento selecionado.\n" + events.length + " evento(s)";
-			eventTypeBtn.txt.text = "Tipo: " + EVENT_TYPES[eventTypeIndex];
-			eventValue1Btn.txt.text = "Valor 1: —";
-			eventValue2Btn.txt.text = "Valor 2: —";
-		} else {
-			eventTypeIndex = EVENT_TYPES.indexOf(ev.type);
-			if (eventTypeIndex < 0) eventTypeIndex = 0;
-			eventInfoTxt.text = "Evento " + (selectedEvent + 1) + "/" + events.length + " · " + fmtTime(ev.time);
-			eventTypeBtn.txt.text = "Tipo: " + ev.type;
-			eventValue1Btn.txt.text = "Valor 1: " + ev.value1;
-			eventValue2Btn.txt.text = "Valor 2: " + (ev.value2 == "" ? "—" : ev.value2);
-		}
-	}
-	function selectEvent(d:Int):Void {
-		if (events.length == 0) return;
-		selectedEvent = selectedEvent < 0 ? 0 : (selectedEvent + d + events.length) % events.length;
-		setTime(events[selectedEvent].time);
-		needRedraw = true;
-	}
-	function cycleEventType():Void {
-		eventTypeIndex = (eventTypeIndex + 1) % EVENT_TYPES.length;
-		if (selectedEvent >= 0 && selectedEvent < events.length) {
-			pushUndo();
-			var ev = events[selectedEvent]; ev.type = EVENT_TYPES[eventTypeIndex]; ev.value1 = defaultEventValue(ev.type); ev.value2 = (ev.type == "Character Change" ? "player" : (ev.type == "HUD Visibility" ? "all" : (ev.type == "Camera Move" ? "0" : "")));
-			markDirty();
-		}
-		updateEventUi();
-	}
-	function changeEventValue(which:Int):Void {
-		if (selectedEvent < 0 || selectedEvent >= events.length) return;
-		var ev = events[selectedEvent];
-		pushUndo();
-		if (ev.type == "Character Change" && which == 1) {
-			var chars = availableCharacters();
-			if (chars.length > 0) { var ci = chars.indexOf(ev.value1); ev.value1 = chars[(ci + 1 + chars.length) % chars.length]; }
-			markDirty(); updateEventUi(); return;
-		}
-		if (ev.type == "Camera Focus" && which == 1) { ev.value1 = ev.value1 == "player" ? "opponent" : "player"; markDirty(); updateEventUi(); return; }
-		if (ev.type == "HUD Visibility" && which == 1) { ev.value1 = (ev.value1 == "true" ? "false" : "true"); markDirty(); updateEventUi(); return; }
-		if (ev.type == "Character Change" && which == 2) { ev.value2 = ev.value2 == "opponent" ? "player" : "opponent"; markDirty(); updateEventUi(); return; }
-		if (ev.type == "HUD Visibility" && which == 2) { var targets = ["all", "health", "score", "notes", "strums"]; var ti = targets.indexOf(ev.value2); ev.value2 = targets[(ti + 1 + targets.length) % targets.length]; markDirty(); updateEventUi(); return; }
-		var v:Float = Std.parseFloat(which == 1 ? ev.value1 : ev.value2);
-		if (Math.isNaN(v)) v = 1;
-		v += (which == 1 ? 0.1 : 1);
-		if (which == 1) ev.value1 = Std.string(Math.round(v * 100) / 100); else ev.value2 = Std.string(Math.round(v * 100) / 100);
-		markDirty(); updateEventUi();
-	}
-	function moveSelectedEvent(dir:Int):Void {
-		if (selectedEvent < 0 || selectedEvent >= events.length) return;
-		var ev = events[selectedEvent];
-		pushUndo();
-		ev.time = Math.max(0, ev.time + dir * snapStep() * stepMs());
-		events.sort(function(a, b) return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0));
-		selectedEvent = events.indexOf(ev); setTime(ev.time); markDirty(); updateEventUi();
-	}
-	function deleteEvent():Void {
-		if (selectedEvent < 0 || selectedEvent >= events.length) return;
-		pushUndo();
-		events.splice(selectedEvent, 1);
-		selectedEvent = events.length == 0 ? -1 : Std.int(Math.min(selectedEvent, events.length - 1));
-		markDirty(); updateEventUi();
+		if (slotSwatch != null)
+			slotSwatch.visible = i == 3;
 	}
 
 	function playSnd(snd:Sound, vol:Float):Void {
@@ -898,7 +941,7 @@ class ChartEditorState extends FlxState {
 		titleTxt.text = shortName(songName, 30) + (dirty ? "  ●" : "");
 		modTxt.text = (mod == "" ? "Sem mod ativo (não salva)" : "Mod: " + mod) + "  ·  " + songId;
 		timeTxt.text = fmtTime(curT) + " / " + fmtTime(songLenMs);
-		infoTxt.text = "Passo " + Math.floor(curStep()) + "  ·  Beat " + Math.floor(curStep() / 4) + "  ·  Seção " + (sec + 1) + "\n" + "Notas " + notes.length + "  ·  Eventos " + events.length
+		infoTxt.text = "Passo " + Math.floor(curStep()) + "  ·  Beat " + Math.floor(curStep() / 4) + "  ·  Seção " + (sec + 1) + "\n" + "Notas " + notes.length
 			+ (sel.length > 0 ? "  ·  " + sel.length + " selecionada(s)" : "");
 		bpmTxt.text = Std.string(Math.round(bpm * 100) / 100);
 		speedTxt.text = Std.string(Math.round(speed * 10) / 10);
@@ -916,9 +959,24 @@ class ChartEditorState extends FlxState {
 		instBtn.act = instOn;
 		for (i in 0...3)
 			toolBtns[i].act = tool == i;
-		for (i in 0...tabBtns.length)
+		for (i in 0...4)
 			tabBtns[i].act = rightTab == i;
-		updateEventUi();
+		var ed = selEv != null ? EventDefs.get(selEv.name) : null;
+		var ef1 = ed != null ? ed.f1 : null;
+		var ef2 = ed != null ? ed.f2 : null;
+		evInfoTxt.text = selEv == null ? "Nenhum evento selecionado.\nTotal: " + events.length : "Passo " + (Math.round(selEv.step * 100) / 100) + "  ·  " + (ed != null ? ed.label : selEv.name) + "\nTotal: " + events.length;
+		evTypeBtn.txt.text = ed != null ? ed.label : "—";
+		evL1.text = ef1 != null ? ef1.label : "";
+		evL2.text = ef2 != null ? ef2.label : "";
+		evV1.txt.text = ef1 != null ? selEv.v1 : "—";
+		evV2.txt.text = ef2 != null ? selEv.v2 : "—";
+		slotBtn.txt.text = "Slot " + selSlot + ": " + slotName(selSlot);
+		charBtn.txt.text = slots[selSlot].id;
+		dxBtn.txt.text = selSlot >= 2 ? "X " + slots[selSlot].dx : "—";
+		dyBtn.txt.text = selSlot >= 2 ? "Y " + slots[selSlot].dy : "—";
+		slotSwatch.color = SLOT_COLORS[selSlot % SLOT_COLORS.length] & 0xFFFFFF;
+		for (bb in [evTypeBtn, evV1, evV2, slotBtn, charBtn, dxBtn, dyBtn])
+			bb.act = true;
 		for (b in btns)
 			paintBtn(b);
 	}
@@ -932,10 +990,14 @@ class ChartEditorState extends FlxState {
 	function snapshot():EdSnap {
 		var c:Array<EdNote> = [];
 		for (n in notes)
-			c.push({step: n.step, lane: n.lane, sus: n.sus});
-		var ec:Array<EdEvent> = [];
-		for (e in events) ec.push({time: e.time, type: e.type, value1: e.value1, value2: e.value2});
-		return {notes: c, must: must.copy(), events: ec};
+			c.push({step: n.step, lane: n.lane, sus: n.sus, ch: n.ch});
+		var ev:Array<EdEvent> = [];
+		for (e in events)
+			ev.push({step: e.step, name: e.name, v1: e.v1, v2: e.v2});
+		var sl:Array<EdSlot> = [];
+		for (sx in slots)
+			sl.push({id: sx.id, dx: sx.dx, dy: sx.dy});
+		return {notes: c, must: must.copy(), events: ev, slots: sl};
 	}
 	function pushUndo():Void {
 		undoS.push(snapshot());
@@ -944,11 +1006,17 @@ class ChartEditorState extends FlxState {
 		redoS = [];
 	}
 	function restore(s:EdSnap):Void {
+		var st = curStep();
 		notes = s.notes;
 		must = s.must;
 		events = s.events;
-		selectedEvent = -1;
+		slots = s.slots;
+		selEv = null;
+		selSlot = Std.int(Math.min(selSlot, slots.length - 1));
+		rebuildSegs();
+		curT = msOfStep(st);
 		sel = [];
+		refreshHdr();
 		markDirty();
 	}
 	function undo():Void {
@@ -979,7 +1047,7 @@ class ChartEditorState extends FlxState {
 		if (was)
 			stopPlay();
 		scrollVel = 0;
-		setTime(step * stepMs());
+		setTime(msOfStep(step));
 		if (was)
 			startPlay();
 	}
@@ -1016,7 +1084,8 @@ class ChartEditorState extends FlxState {
 		var st = curStep();
 		bpm = Math.max(20, Math.min(400, bpm + d));
 		Conductor.setBpm(bpm);
-		curT = st * stepMs();
+		rebuildSegs();
+		curT = msOfStep(st);
 		markDirty();
 		setStatus("BPM mudou: as notas continuam nos mesmos steps (o tempo em ms muda).");
 	}
@@ -1067,7 +1136,7 @@ class ChartEditorState extends FlxState {
 				continue;
 			keep.push(n);
 			if (inSection(n, sec - 1))
-				added.push({step: n.step + STEPS, lane: n.lane, sus: n.sus});
+				added.push({step: n.step + STEPS, lane: n.lane, sus: n.sus, ch: n.ch});
 		}
 		notes = keep.concat(added);
 		ensureSection(sec);
@@ -1107,7 +1176,7 @@ class ChartEditorState extends FlxState {
 				undoS.pop();
 				return;
 			}
-			notes.push({step: st, lane: lane, sus: 0});
+			notes.push({step: st, lane: lane, sus: 0, ch: -1});
 			if (hitOn)
 				playSnd(hitSnd, 0.3);
 		}
@@ -1136,7 +1205,7 @@ class ChartEditorState extends FlxState {
 			m = Math.min(m, n.step);
 		clip = [];
 		for (n in sel)
-			clip.push({d: n.step - m, lane: n.lane, sus: n.sus});
+			clip.push({d: n.step - m, lane: n.lane, sus: n.sus, ch: n.ch});
 		setStatus(clip.length + " notas copiadas. Role até o destino e toque em Colar.");
 	}
 	function pasteSel():Void {
@@ -1148,7 +1217,7 @@ class ChartEditorState extends FlxState {
 		var base = snapRound(curStep());
 		sel = [];
 		for (c in clip) {
-			var n:EdNote = {step: base + c.d, lane: c.lane, sus: c.sus};
+			var n:EdNote = {step: base + c.d, lane: c.lane, sus: c.sus, ch: c.ch};
 			notes.push(n);
 			sel.push(n);
 		}
@@ -1239,7 +1308,7 @@ class ChartEditorState extends FlxState {
 		}
 	}
 	function inGrid(x:Float, y:Float):Bool
-		return x >= gx - CAMW && x < gx + 8 * cw && y >= GY0 && y < GY0 + GH;
+		return x >= gx - CAMW && x < gx + 8 * cw + EVW + 8 && y >= GY0 && y < GY0 + GH;
 
 	function btnHit(b:EdBtn, x:Float, y:Float):Bool
 		return b.on && (b.en == null || b.en()) && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
@@ -1271,7 +1340,7 @@ class ChartEditorState extends FlxState {
 				gMode = 0;
 				scrollVel = 0;
 				gNote = null;
-				if (px >= gx && tool == 0)
+				if (px >= gx && px < gx + 8 * cw && tool == 0)
 					gNote = noteAtTap(Std.int(Math.max(0, Math.min(7, Math.floor((px - gx) / cw)))), stepOfY(py));
 			}
 		}
@@ -1311,7 +1380,7 @@ class ChartEditorState extends FlxState {
 		}
 		if (gMode == 1) {
 			var old = curT;
-			setTime(gSCurT - dy / stepH() * stepMs());
+			setTime(msOfStep(stepOfMs(gSCurT) - dy / stepH()));
 			if (elapsed > 0)
 				scrollVel = scrollVel * 0.6 + 0.4 * ((curT - old) / elapsed);
 		} else if (gMode == 2) {
@@ -1358,13 +1427,9 @@ class ChartEditorState extends FlxState {
 	}
 	function tapGrid(x:Float, y:Float):Void {
 		var rawStep = stepOfY(y);
-		if (x >= gx + 8 * cw - 22) {
-			var best = -1; var dist = 999999.0;
-			for (i in 0...events.length) {
-				var d = Math.abs(yOfStep(events[i].time / stepMs()) - y);
-				if (d < dist && d <= 12) { dist = d; best = i; }
-			}
-			if (best >= 0) { selectedEvent = best; setTime(events[best].time); setRightTab(3); updateEventUi(); needRedraw = true; return; }
+		if (x >= gx + 8 * cw) {
+			tapEvents(y);
+			return;
 		}
 		if (x < gx) {
 			if (rawStep >= 0)
@@ -1385,6 +1450,282 @@ class ChartEditorState extends FlxState {
 			needRedraw = true;
 		}
 	}
+	function getEvText():FlxText {
+		var t:FlxText;
+		if (evTextN >= evTexts.length) {
+			t = new FlxText(0, 0, EVW, "", 10);
+			t.setFormat(Paths.font("ui.ttf"), 10, 0xFFFFFFFF, FlxTextAlign.CENTER);
+			t.antialiasing = Options.antialiasing;
+			evTxtGrp.add(t);
+			evTexts.push(t);
+		} else
+			t = evTexts[evTextN];
+		evTextN++;
+		t.visible = true;
+		return t;
+	}
+
+	function refreshHdr():Void {
+		for (i in 0...2) {
+			var old = hdrIcons[i];
+			var ic = new HealthIcon(charIcon(slots[i].id), false);
+			ic.setGraphicSize(32, 32);
+			ic.updateHitbox();
+			var idx = members.indexOf(old);
+			remove(old, true);
+			insert(idx < 0 ? members.length : idx, ic);
+			old.destroy();
+			hdrIcons[i] = ic;
+		}
+		applyZoom();
+	}
+
+	function triRow(y:Float, tab:Int, f:Void->Void, g:Void->Void, ?en:Void->Bool):EdBtn {
+		var l = mk(RX, y, 48, 36, "‹", f, 0, 17, tab);
+		var c = mk(RX + 52, y, RW - 104, 36, "", function() {}, 4, 13, tab);
+		var r = mk(RX + RW - 48, y, 48, 36, "›", g, 0, 17, tab);
+		if (en != null) {
+			enableWhen(l, en);
+			enableWhen(r, en);
+		}
+		return c;
+	}
+
+	function evRow(y:Float, field:Int):EdBtn {
+		var w = 38.0;
+		var en = function() return evFieldOf(field) != null;
+		enableWhen(mk(RX, y, w, 36, "‹‹", function() evStepField(field, -1, true), 0, 15, 2), en);
+		enableWhen(mk(RX + w + 4, y, w, 36, "‹", function() evStepField(field, -1, false), 0, 15, 2), en);
+		var c = mk(RX + 2 * (w + 4), y, RW - 4 * (w + 4), 36, "", function() {}, 4, 13, 2);
+		enableWhen(mk(RX + RW - 2 * w - 4, y, w, 36, "›", function() evStepField(field, 1, false), 0, 15, 2), en);
+		enableWhen(mk(RX + RW - w, y, w, 36, "››", function() evStepField(field, 1, true), 0, 15, 2), en);
+		return c;
+	}
+
+	function evFieldOf(field:Int):EvField {
+		if (selEv == null)
+			return null;
+		var d = EventDefs.get(selEv.name);
+		return d == null ? null : (field == 1 ? d.f1 : d.f2);
+	}
+
+	function modEvents(f:Void->Void):Void {
+		var st = curStep();
+		pushUndo();
+		f();
+		sortEvents();
+		rebuildSegs();
+		curT = msOfStep(st);
+		markDirty();
+	}
+
+	function addEventAt(step:Float):Void {
+		var d = EventDefs.get(lastEvType);
+		if (d == null)
+			d = EventDefs.LIST[0];
+		var e:EdEvent = {step: Math.max(0, step), name: d.name, v1: d.f1 != null ? d.f1.def : "", v2: d.f2 != null ? d.f2.def : ""};
+		modEvents(function() {
+			events.push(e);
+		});
+		selEv = e;
+		setRightTab(2);
+		setStatus("Evento \"" + d.label + "\" criado no passo " + (Math.round(e.step * 100) / 100) + ".");
+	}
+
+	function deleteEv():Void {
+		if (selEv == null)
+			return;
+		var e = selEv;
+		modEvents(function() {
+			events.remove(e);
+		});
+		selEv = null;
+		setStatus("Evento apagado.");
+	}
+
+	function evCycleType(dir:Int):Void {
+		if (selEv == null)
+			return;
+		var L = EventDefs.LIST;
+		var i = 0;
+		for (k in 0...L.length)
+			if (L[k].name == selEv.name)
+				i = k;
+		var d = L[(i + dir + L.length) % L.length];
+		var e = selEv;
+		modEvents(function() {
+			e.name = d.name;
+			e.v1 = d.f1 != null ? d.f1.def : "";
+			e.v2 = d.f2 != null ? d.f2.def : "";
+		});
+		lastEvType = d.name;
+	}
+
+	function evStepField(field:Int, dir:Int, big:Bool):Void {
+		var f = evFieldOf(field);
+		if (f == null)
+			return;
+		var e = selEv;
+		modEvents(function() {
+			if (field == 1)
+				e.v1 = EventDefs.stepVal(f, e.v1, dir, big);
+			else
+				e.v2 = EventDefs.stepVal(f, e.v2, dir, big);
+		});
+	}
+
+	function evMove(dir:Int):Void {
+		if (selEv == null)
+			return;
+		var e = selEv;
+		var ns = e.step + dir * snapStep();
+		if (ns < 0)
+			return;
+		modEvents(function() {
+			e.step = ns;
+		});
+	}
+
+	function evNav(dir:Int):Void {
+		if (events.length == 0) {
+			setStatus("Ainda não há eventos.");
+			return;
+		}
+		var cs = curStep();
+		var tgt:EdEvent = null;
+		var ci = selEv != null ? events.indexOf(selEv) : -1;
+		if (ci >= 0) {
+			var i = ci + dir;
+			if (i >= 0 && i < events.length)
+				tgt = events[i];
+		} else
+			for (e in events) {
+				if (dir > 0 && e.step > cs + 0.01) {
+					tgt = e;
+					break;
+				}
+				if (dir < 0 && e.step < cs - 0.01)
+					tgt = e;
+			}
+		if (tgt == null) {
+			setStatus("Não há mais eventos nessa direção.");
+			return;
+		}
+		selEv = tgt;
+		navTo(tgt.step);
+	}
+
+	function tapEvents(y:Float):Void {
+		var ebh = Math.max(14, Math.min(cw - 4, 24));
+		var hits:Array<EdEvent> = [];
+		var stacks:Map<Int, Int> = new Map();
+		for (e in events) {
+			var ek = Math.round(e.step * 100);
+			var kk = stacks.exists(ek) ? stacks.get(ek) : 0;
+			stacks.set(ek, kk + 1);
+			var by = yOfStep(e.step) + kk * (ebh + 1);
+			if (y >= by - 2 && y <= by + ebh + 2)
+				hits.push(e);
+		}
+		if (hits.length > 0) {
+			selEv = hits[(hits.indexOf(selEv) + 1) % hits.length];
+			setRightTab(2);
+			needRedraw = true;
+			return;
+		}
+		addEventAt(snapFloor(stepOfY(y)));
+	}
+
+	function slotName(i:Int):String
+		return i == 0 ? "Oponente" : (i == 1 ? "Jogador" : "Extra " + (i - 1));
+
+	function castStepSlot(d:Int):Void
+		selSlot = (selSlot + d + slots.length) % slots.length;
+
+	function castStepChar(d:Int):Void {
+		var ids = EventDefs.charIds();
+		if (ids.length == 0)
+			return;
+		pushUndo();
+		var i = ids.indexOf(slots[selSlot].id);
+		i = i < 0 ? 0 : (i + d + ids.length) % ids.length;
+		slots[selSlot].id = ids[i];
+		markDirty();
+		if (selSlot < 2)
+			refreshHdr();
+		setStatus(slotName(selSlot) + " agora é \"" + ids[i] + "\".");
+	}
+
+	function castMove(axis:Int, d:Float):Void {
+		if (selSlot < 2)
+			return;
+		pushUndo();
+		if (axis == 0)
+			slots[selSlot].dx += d;
+		else
+			slots[selSlot].dy += d;
+		markDirty();
+	}
+
+	function castAdd():Void {
+		if (slots.length >= 8)
+			return;
+		pushUndo();
+		var n = slots.length - 2;
+		var ids = EventDefs.charIds();
+		var dx:Float = n == 0 ? 0 : (n % 2 == 1 ? 1 : -1) * 170 * Math.ceil(n / 2);
+		slots.push({id: ids.indexOf("bf") >= 0 ? "bf" : (ids.length > 0 ? ids[0] : "bf"), dx: dx, dy: 0});
+		selSlot = slots.length - 1;
+		markDirty();
+		setStatus("Personagem extra adicionado. Troque o personagem e atribua notas a ele.");
+	}
+
+	function castRemove():Void {
+		if (selSlot < 2)
+			return;
+		pushUndo();
+		var r = selSlot;
+		slots.splice(r, 1);
+		for (n in notes) {
+			if (n.ch == r)
+				n.ch = -1;
+			else if (n.ch > r)
+				n.ch--;
+		}
+		for (e in events)
+			if (e.name == "Camera Focus" || e.name == "Change Character" || e.name == "Play Anim") {
+				var v = Std.parseFloat(e.v1);
+				if (Math.isNaN(v))
+					continue;
+				if (Std.int(v) == r)
+					e.v1 = e.name == "Camera Focus" ? "-1" : "1";
+				else if (v > r)
+					e.v1 = Std.string(Std.int(v) - 1);
+			}
+		selSlot = Std.int(Math.min(selSlot, slots.length - 1));
+		markDirty();
+	}
+
+	function notesInSection(sec:Int):Array<EdNote> {
+		var a:Array<EdNote> = [];
+		for (n in notes)
+			if (inSection(n, sec))
+				a.push(n);
+		return a;
+	}
+
+	function assignNotes(list:Array<EdNote>, ch:Int):Void {
+		if (list.length == 0) {
+			setStatus("Nenhuma nota para atribuir.");
+			return;
+		}
+		pushUndo();
+		for (n in list)
+			n.ch = ch;
+		markDirty();
+		setStatus(list.length + " notas -> " + (ch < 0 ? "cantor padrão do lado" : slotName(ch)) + ".");
+	}
+
 	function togglePlay():Void {
 		if (playing)
 			stopPlay();
@@ -1415,12 +1756,11 @@ class ChartEditorState extends FlxState {
 
 	function updatePlayback():Void {
 		var t = inst.time;
-		var sm = stepMs();
 		if (t < lastT)
 			lastT = t;
 		var hit = false;
 		for (n in notes) {
-			var nt = n.step * sm;
+			var nt = msOfStep(n.step);
 			if (nt > lastT && nt <= t) {
 				hit = true;
 				var s = strums[n.lane];
@@ -1430,8 +1770,7 @@ class ChartEditorState extends FlxState {
 		}
 		if (hit && hitOn)
 			playSnd(hitSnd, 0.35);
-		var bm = sm * 4;
-		if (metroOn && Math.floor(t / bm) != Math.floor(lastT / bm))
+		if (metroOn && Math.floor(stepOfMs(t) / 4) != Math.floor(stepOfMs(lastT) / 4))
 			playSnd(metroSnd, 0.5);
 		lastT = t;
 		curT = Math.min(t, songLenMs);
@@ -1448,13 +1787,11 @@ class ChartEditorState extends FlxState {
 			return false;
 		}
 		try {
-			var sm = stepMs();
-			var secMs = STEPS * sm;
 			var lastSec = 0;
 			for (n in notes)
 				lastSec = Std.int(Math.max(lastSec, Math.floor((n.step + 0.001) / STEPS)));
 			for (e in extras)
-				lastSec = Std.int(Math.max(lastSec, Math.floor(e.t / secMs)));
+				lastSec = Std.int(Math.max(lastSec, Math.floor((e.step + 0.001) / STEPS)));
 			var count = Std.int(Math.max(lastSec + 1, must.length));
 			ensureSection(count - 1);
 
@@ -1467,15 +1804,22 @@ class ChartEditorState extends FlxState {
 			}
 			for (n in notes) {
 				var si = Std.int(Math.floor((n.step + 0.001) / STEPS));
-				var t = Math.round(n.step * sm * 100) / 100;
-				var sus = n.sus > 0 ? Math.round(n.sus * sm * 100) / 100 : 0;
+				var t = Math.round(msOfStep(n.step) * 100) / 100;
+				var sus = n.sus > 0 ? Math.round((msOfStep(n.step + n.sus) - msOfStep(n.step)) * 100) / 100 : 0;
 				var isPlayer = n.lane >= 4;
 				var d = n.lane % 4;
 				var fileLane = (isPlayer == must[si]) ? d : d + 4;
-				sns[si].push([t, fileLane, sus]);
+				if (n.ch >= 0)
+					sns[si].push([t, fileLane, sus, n.ch]);
+				else
+					sns[si].push([t, fileLane, sus]);
 			}
 			for (e in extras)
-				sns[Std.int(Math.floor(e.t / secMs))].push(e.arr);
+			{
+				var ea:Array<Dynamic> = e.arr.copy();
+				ea[0] = Math.round(msOfStep(e.step) * 100) / 100;
+				sns[Std.int(Math.floor((e.step + 0.001) / STEPS))].push(ea);
+			}
 			for (sn in sns)
 				sn.sort(function(a:Dynamic, b:Dynamic) return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0));
 
@@ -1486,9 +1830,16 @@ class ChartEditorState extends FlxState {
 			Reflect.setField(out, "bpm", bpm);
 			Reflect.setField(out, "speed", speed);
 			Reflect.setField(out, "notes", secs);
-			var evOut:Array<Dynamic> = [];
-			for (ev in events) evOut.push({time: ev.time, type: ev.type, value1: ev.value1, value2: ev.value2});
-			Reflect.setField(out, "events", evOut);
+			Reflect.setField(out, "player2", slots[0].id);
+			Reflect.setField(out, "player1", slots[1].id);
+			var exs:Array<Dynamic> = [];
+			for (i in 2...slots.length)
+				exs.push({id: slots[i].id, dx: slots[i].dx, dy: slots[i].dy});
+			Reflect.setField(out, "chars", exs);
+			var evo:Array<Dynamic> = [];
+			for (ev in events)
+				evo.push({t: Math.round(msOfStep(ev.step) * 100) / 100, e: ev.name, v1: ev.v1, v2: ev.v2});
+			Reflect.setField(out, "events", evo);
 
 			var dir = Paths.modsDir() + mod + "/songs/" + songId + "/";
 			if (!Paths.ensureDir(dir))
@@ -1558,15 +1909,17 @@ class ChartEditorState extends FlxState {
 		if (k.justPressed.DOWN) {
 			if (playing)
 				stopPlay();
-			setTime(curT + snapStep() * stepMs());
+			setTime(msOfStep(curStep() + snapStep()));
 		}
 		if (k.justPressed.UP) {
 			if (playing)
 				stopPlay();
-			setTime(curT - snapStep() * stepMs());
+			setTime(msOfStep(curStep() - snapStep()));
 		}
 		if (k.justPressed.DELETE)
 			deleteSel();
+		if (k.justPressed.E)
+			addEventAt(snapRound(curStep()));
 		if (k.pressed.CONTROL) {
 			if (k.justPressed.Z) {
 				if (k.pressed.SHIFT)
@@ -1590,7 +1943,7 @@ class ChartEditorState extends FlxState {
 		if (FlxG.mouse.wheel != 0) {
 			if (playing)
 				stopPlay();
-			setTime(curT - FlxG.mouse.wheel * stepMs() * snapStep() * 2);
+			setTime(msOfStep(curStep() - FlxG.mouse.wheel * snapStep() * 2));
 		}
 		#end
 	}

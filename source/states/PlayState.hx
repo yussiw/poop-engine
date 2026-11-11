@@ -15,7 +15,7 @@ import flixel.util.FlxTimer;
 import flixel.ui.FlxBar;
 import flixel.util.FlxColor;
 
-typedef NoteData = {t:Float, d:Int, sus:Float, p:Bool};
+typedef NoteData = {t:Float, d:Int, sus:Float, p:Bool, ch:Int};
 
 @:keep
 class PlayState extends FlxState {
@@ -27,6 +27,7 @@ class PlayState extends FlxState {
 	public var speed:Float = 2;
 	public var bf:Character;
 	public var dad:Character;
+	public var chars:Array<Character> = [];
 	public var health:Float = 1;
 	public var score:Int = 0;
 	public var combo:Int = 0;
@@ -47,9 +48,6 @@ class PlayState extends FlxState {
 	var unspawn:Array<NoteData> = [];
 
 	var unspawnIdx:Int = 0;
-	var songEvents:Array<Dynamic> = [];
-	var eventIdx:Int = 0;
-	var hudEventVisible:Bool = true;
 
 	var killList:Array<Note> = [];
 	var hitbox:Array<FlxSprite> = [];
@@ -63,7 +61,13 @@ class PlayState extends FlxState {
 	public var watermark:FlxText;
 	public var accuracy:Float = 0;
 	var camFollow:FlxObject;
-	var defaultZoom:Float = 0.9;
+	public var defaultZoom:Float = 0.9;
+	var camSlot:Int = -1;
+	var evList:Array<{t:Float, e:String, v1:String, v2:String}> = [];
+	var evIdx:Int = 0;
+	var bpmStep:Float = 0;
+	var bpmTime:Float = 0;
+	var zoomTw:FlxTween;
 	var started:Bool = false;
 	var dead:Bool = false;
 	var lastTime:Float = -1;
@@ -121,6 +125,17 @@ class PlayState extends FlxState {
 		var bfPos:Array<Float> = stageData.bf;
 		dad = new Character(dadPos[0], dadPos[1], chart.player2, false);
 		bf = new Character(bfPos[0], bfPos[1], chart.player1, true);
+		chars = [dad, bf];
+		var exArr:Array<Dynamic> = chart.chars != null ? chart.chars : [];
+		var ax:Float = stageData.gf != null ? stageData.gf[0] : (dadPos[0] + bfPos[0]) / 2;
+		var ay:Float = stageData.gf != null ? stageData.gf[1] : Math.min(dadPos[1], bfPos[1]);
+		for (ec in exArr) {
+			var ox:Float = ec.dx != null ? ec.dx : 0;
+			var oy:Float = ec.dy != null ? ec.dy : 0;
+			var c = new Character(ax + ox, ay + oy, Std.string(ec.id), false);
+			chars.push(c);
+			add(c);
+		}
 		add(dad);
 		add(bf);
 		for (s in front)
@@ -237,88 +252,120 @@ class PlayState extends FlxState {
 				if (d < 0)
 					continue;
 				var sus:Float = n[2] != null ? n[2] : 0;
-				unspawn.push({t: n[0], d: d % 4, sus: sus > 0 ? sus : 0, p: d < 4 ? must : !must});
+				var na:Array<Dynamic> = n;
+				var chv:Int = (na.length > 3 && na[3] != null) ? Std.int(na[3]) : -1;
+				unspawn.push({t: n[0], d: d % 4, sus: sus > 0 ? sus : 0, p: d < 4 ? must : !must, ch: chv});
 			}
 		}
 		unspawn.sort(function(a, b) return Std.int(a.t - b.t));
 	}
 
+	public function singer(mustPress:Bool, ch:Int):Character
+		return (ch >= 0 && ch < chars.length) ? chars[ch] : (mustPress ? bf : dad);
+
+	function num(s:String, d:Float):Float {
+		var v = Std.parseFloat(s);
+		return Math.isNaN(v) ? d : v;
+	}
+
 	function loadEvents():Void {
-		if (chart.events != null) songEvents = cast chart.events; else songEvents = [];
-		songEvents.sort(function(a:Dynamic, b:Dynamic) return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0));
-		eventIdx = 0;
+		var raw:Array<Dynamic> = chart.events != null ? chart.events : [];
+		for (e in raw)
+			evList.push({t: e.t, e: Std.string(e.e), v1: e.v1 != null ? Std.string(e.v1) : "", v2: e.v2 != null ? Std.string(e.v2) : ""});
+		evList.sort(function(a, b) return a.t < b.t ? -1 : (a.t > b.t ? 1 : 0));
 	}
-	function processSongEvents():Void {
-		while (eventIdx < songEvents.length) {
-			var ev:Dynamic = songEvents[eventIdx];
-			if (ev == null || ev.time > Conductor.songPosition) break;
-			eventIdx++;
-			applySongEvent(ev);
+
+	function swapChar(slot:Int, id:String):Void {
+		if (slot < 0 || slot >= chars.length || id == null || id == "")
+			return;
+		var old = chars[slot];
+		var nu = new Character(old.x, old.y, id, old.isPlayer);
+		var idx = members.indexOf(old);
+		remove(old, true);
+		insert(idx < 0 ? members.length : idx, nu);
+		old.destroy();
+		chars[slot] = nu;
+		if (slot == 0)
+			dad = nu;
+		if (slot == 1)
+			bf = nu;
+		if (slot < 2) {
+			var oi = slot == 1 ? iconP1 : iconP2;
+			var ni = new HealthIcon(nu.icon, slot == 1);
+			ni.cameras = [camHUD];
+			var ii = members.indexOf(oi);
+			remove(oi, true);
+			insert(ii < 0 ? members.length : ii, ni);
+			oi.destroy();
+			if (slot == 1)
+				iconP1 = ni;
+			else
+				iconP2 = ni;
 		}
 	}
-	function applySongEvent(ev:Dynamic):Void {
-		var typ = ev.type != null ? Std.string(ev.type) : "";
-		var v1 = ev.value1 != null ? Std.string(ev.value1) : "";
-		var v2 = ev.value2 != null ? Std.string(ev.value2) : "";
-		switch (typ) {
-			case "Zoom":
-				var z = Std.parseFloat(v1);
-				if (!Math.isNaN(z) && z > 0) { defaultZoom = z; FlxG.camera.zoom = z; }
+
+	function fireEvent(name:String, v1:String, v2:String, t:Float):Void {
+		if (callScript("onEvent", [name, v1, v2]))
+			return;
+		switch (name) {
 			case "Camera Focus":
-				moveCam(v1.toLowerCase() == "player" || v1.toLowerCase() == "jogador");
-			case "Camera Move":
-				var x = Std.parseFloat(v1); var y = Std.parseFloat(v2);
-				if (!Math.isNaN(x) && !Math.isNaN(y)) camFollow.setPosition(x, y);
-			case "HUD Visibility":
-				setHudVisible(v1.toLowerCase() == "true" || v1 == "1" || v1.toLowerCase() == "show", v2);
-			case "BPM Change":
-				var b = Std.parseFloat(v1);
-				if (!Math.isNaN(b) && b > 0) { Conductor.setBpm(b); chart.bpm = b; }
-			case "Character Change":
-				var side = v2.toLowerCase();
-				if (side == "opponent" || side == "dad" || side == "oponente") changeCharacter(false, v1);
-				else changeCharacter(true, v1);
+				camSlot = Std.int(num(v1, -1));
+				moveCam(sectionMustHit(Std.int(Math.max(0, curStep) / 16)));
+			case "Camera Zoom":
+				var z = num(v1, defaultZoom);
+				var d = num(v2, 0);
+				if (zoomTw != null)
+					zoomTw.cancel();
+				if (d <= 0) {
+					defaultZoom = z;
+					FlxG.camera.zoom = z;
+				} else
+					zoomTw = FlxTween.num(defaultZoom, z, d, {ease: FlxEase.quadInOut}, function(v:Float) defaultZoom = v);
+			case "Zoom Bump":
+				FlxG.camera.zoom += num(v1, 0.03);
+				camHUD.zoom += num(v2, 0.05);
+			case "Camera Shake":
+				FlxG.camera.shake(num(v1, 0.01), num(v2, 0.3));
+			case "Camera Flash":
+				var col:Null<FlxColor> = FlxColor.fromString("#" + v1);
+				camHUD.flash(col == null ? FlxColor.WHITE : col, num(v2, 0.5));
+			case "HUD Alpha":
+				var a = num(v1, 1);
+				var d = num(v2, 0);
+				if (d <= 0)
+					camHUD.alpha = a;
+				else
+					FlxTween.num(camHUD.alpha, a, d, null, function(v:Float) camHUD.alpha = v);
+			case "Change BPM":
+				var b = num(v1, 0);
+				if (b > 0) {
+					bpmStep += (t - bpmTime) / Conductor.stepCrochet;
+					bpmTime = t;
+					Conductor.setBpm(b);
+				}
+			case "Scroll Speed":
+				var sp = num(v1, speed);
+				var d = num(v2, 0);
+				if (d <= 0) {
+					speed = sp;
+					pxMs = 0.45 * sp;
+				} else
+					FlxTween.num(speed, sp, d, {ease: FlxEase.quadInOut}, function(v:Float) {
+						speed = v;
+						pxMs = 0.45 * v;
+					});
+			case "Change Character":
+				swapChar(Std.int(num(v1, 1)), v2);
+			case "Play Anim":
+				var i = Std.int(num(v1, 1));
+				if (i >= 0 && i < chars.length)
+					chars[i].playAnim(v2);
+			default:
 		}
-		callScript("onEvent", [typ, v1, v2]);
-	}
-	function setHudVisible(show:Bool, target:String = "all"):Void {
-		var all = target == null || target == "" || target == "all";
-		if (all) hudEventVisible = show;
-		if (all || target == "health") for (s in [healthBarBG, healthBar, iconP1, iconP2]) if (s != null) s.visible = show;
-		if (all || target == "score") for (s in [scoreTxt, watermark]) if (s != null) s.visible = show;
-		if (all || target == "strums") {
-			for (s in playerStrums) s.visible = show;
-			for (s in oppStrums) s.visible = show;
-		}
-		if (all || target == "notes") {
-			if (notes != null) notes.visible = show;
-			if (sustains != null) sustains.visible = show;
-			if (splashes != null) splashes.visible = show;
-		}
-	}
-	function changeCharacter(player:Bool, id:String):Void {
-		if (id == null || id == "") return;
-		if (player) {
-			var x = bf.x; var y = bf.y; var iconVisible = iconP1 == null ? true : iconP1.visible;
-			remove(bf, true); bf.destroy();
-			bf = new Character(x, y, id, true); add(bf);
-			chart.player1 = id;
-			if (iconP1 != null) { remove(iconP1, true); iconP1.destroy(); }
-			iconP1 = new HealthIcon(bf.icon, true); iconP1.cameras = [camHUD]; iconP1.visible = iconVisible; add(iconP1);
-		} else {
-			var x = dad.x; var y = dad.y; var iconVisible = iconP2 == null ? true : iconP2.visible;
-			remove(dad, true); dad.destroy();
-			dad = new Character(x, y, id, false); add(dad);
-			chart.player2 = id;
-			if (iconP2 != null) { remove(iconP2, true); iconP2.destroy(); }
-			iconP2 = new HealthIcon(dad.icon, false); iconP2.cameras = [camHUD]; iconP2.visible = iconVisible; add(iconP2);
-		}
-		moveCam(player);
 	}
 
 	function startSong():Void {
 		started = true;
-		eventIdx = 0;
 		Conductor.songPosition = 0;
 		inst.play();
 		if (voices != null)
@@ -377,8 +424,11 @@ class PlayState extends FlxState {
 				voices.time = inst.time;
 		}
 
-		processSongEvents();
-		var step = Math.floor(Conductor.songPosition / Conductor.stepCrochet);
+		while (evIdx < evList.length && evList[evIdx].t <= Conductor.songPosition) {
+			var ev = evList[evIdx++];
+			fireEvent(ev.e, ev.v1, ev.v2, ev.t);
+		}
+		var step = Math.floor(bpmStep + (Conductor.songPosition - bpmTime) / Conductor.stepCrochet + 0.001);
 		if (step != curStep) {
 			curStep = step;
 			stepHit(step);
@@ -388,6 +438,7 @@ class PlayState extends FlxState {
 		while (unspawnIdx < unspawn.length && unspawn[unspawnIdx].t - Conductor.songPosition < 1800 / speed) {
 			var d = unspawn[unspawnIdx++];
 			var n = new Note(d.t, d.d, d.sus, d.p);
+			n.ch = d.ch;
 			notes.add(n);
 			if (n.sustain != null)
 				sustains.add(n.sustain);
@@ -424,8 +475,8 @@ class PlayState extends FlxState {
 		if (b < 0)
 			countdown(b + 4);
 		if (b % 2 == 0) {
-			bf.danceIfIdle();
-			dad.danceIfIdle();
+			for (c in chars)
+				c.danceIfIdle();
 		}
 		if (b >= 0 && b % 4 == 0 && Options.camZooming) {
 			FlxG.camera.zoom += 0.015;
@@ -461,13 +512,9 @@ class PlayState extends FlxState {
 	function moveCam(mustHit:Bool):Void {
 		if (callScript("onCameraMove", [mustHit]))
 			return;
-		if (mustHit) {
-			var m = bf.getMidpoint();
-			camFollow.setPosition(m.x - 100, m.y - 100);
-		} else {
-			var m = dad.getMidpoint();
-			camFollow.setPosition(m.x + 150, m.y - 100);
-		}
+		var c:Character = (camSlot >= 0 && camSlot < chars.length) ? chars[camSlot] : (mustHit ? bf : dad);
+		var m = c.getMidpoint();
+		camFollow.setPosition(m.x + (c == bf ? -100 : (c == dad ? 150 : 0)), m.y - 100);
 	}
 	function handleInput():Void {
 		for (i in 0...4) {
@@ -536,7 +583,7 @@ class PlayState extends FlxState {
 		n.wasHit = true;
 		n.visible = false;
 		playerStrums[n.lane].play("confirm");
-		bf.sing(n.lane);
+		singer(true, n.ch).sing(n.lane);
 		if (voices != null)
 			voices.volume = 1;
 		popup(r);
@@ -555,7 +602,7 @@ class PlayState extends FlxState {
 		misses++;
 		total++;
 		score -= 10;
-		bf.sing(n.lane, true);
+		singer(true, n.ch).sing(n.lane, true);
 		if (voices != null)
 			voices.volume = 0;
 		FlxG.sound.play(Paths.sfx("missnote" + FlxG.random.int(1, 3)), 0.2);
@@ -575,7 +622,7 @@ class PlayState extends FlxState {
 
 	function opponentHit(n:Note):Void {
 		n.wasHit = true;
-		dad.sing(n.lane);
+		singer(false, n.ch).sing(n.lane);
 		oppStrums[n.lane].play("confirm");
 		oppStrums[n.lane].resetTimer = 0.15;
 		if (voices != null)
@@ -609,16 +656,17 @@ class PlayState extends FlxState {
 				if (n.mustPress && n.sustainLength > 0 && Conductor.songPosition < end) {
 					if (Controls.pressed[n.lane]) {
 						n.held = true;
-						bf.holdTimer = 0;
-						if (bf.animation.curAnim == null || bf.animation.curAnim.name != Character.SING[n.lane])
-							bf.sing(n.lane);
+						var hc = singer(true, n.ch);
+						hc.holdTimer = 0;
+						if (hc.animation.curAnim == null || hc.animation.curAnim.name != Character.SING[n.lane])
+							hc.sing(n.lane);
 						health = Math.min(2, health + 0.05 * elapsed);
 					} else if (Conductor.songPosition < end - 100) {
 						kill.push(n);
 						continue;
 					}
 				} else if (!n.mustPress && n.sustainLength > 0 && Conductor.songPosition < end) {
-					dad.holdTimer = 0;
+					singer(false, n.ch).holdTimer = 0;
 					oppStrums[n.lane].resetTimer = 0.1;
 				}
 				if (Conductor.songPosition >= end)

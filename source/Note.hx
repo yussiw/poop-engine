@@ -15,6 +15,7 @@ class Note extends FlxSprite {
 	public var wasHit:Bool = false;
 	public var tooLate:Bool = false;
 	public var held:Bool = false;
+	public var ch:Int = -1;
 	public var sustain:FlxSprite = null;
 	public var tail:FlxSprite = null;
 
