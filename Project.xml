@@ -43,4 +43,7 @@
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
 	<haxedef name="FLX_NO_SOUND_TRAY" if="mobile" />
 	<haxedef name="analyzer-optimize" unless="debug" />
+	<haxedef name="HXCPP_CHECK_POINTER" if="windows" />
+	<haxedef name="HXCPP_STACK_LINE" if="windows" />
+	<haxedef name="HXCPP_STACK_TRACE" if="windows" />
 </project>
