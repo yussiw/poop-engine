@@ -658,7 +658,7 @@ class PlayState extends FlxState {
 						n.held = true;
 						var hc = singer(true, n.ch);
 						hc.holdTimer = 0;
-						if (hc.animation.curAnim == null || hc.animation.curAnim.name != Character.SING[n.lane])
+						if (hc.animation.curAnim == null || hc.animation.curAnim.name != Character.SING_ANIMS[n.lane])
 							hc.sing(n.lane);
 						health = Math.min(2, health + 0.05 * elapsed);
 					} else if (Conductor.songPosition < end - 100) {
