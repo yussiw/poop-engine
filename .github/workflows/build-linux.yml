@@ -1,3 +1,4 @@
+
 name: Build Linux
 
 on:
@@ -76,7 +77,8 @@ jobs:
             libpulse-dev \
             libdbus-1-dev \
             libudev-dev \
-            libopenal-dev
+            libopenal-dev \
+            binutils
 
       - name: Verificar Haxe
         run: |
@@ -99,11 +101,20 @@ jobs:
           uname -m
           g++ -dumpmachine
 
+      - name: Reconstruir Lime ARM64
+        run: |
+          haxelib run lime rebuild cpp -64 -release -clean
+
       - name: Compilar ARM64
         run: |
-          haxelib run lime build linux -final \
-            -D HXCPP_ARM64 \
-            -D HXCPP_LINUX_ARM64
+          haxelib run lime build linux -final
+
+      - name: Verificar binarios ARM64
+        run: |
+          file export/release/linux/bin/PoopEngine
+          file export/release/linux/bin/lime.ndll
+          readelf -h export/release/linux/bin/PoopEngine | grep -q "AArch64"
+          readelf -h export/release/linux/bin/lime.ndll | grep -q "AArch64"
 
       - name: Empacotar
         run: |
