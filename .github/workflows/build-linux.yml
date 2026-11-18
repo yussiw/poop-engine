@@ -1,4 +1,3 @@
-
 name: Build Linux
 
 on:
@@ -90,12 +89,23 @@ jobs:
       - name: Instalar libs
         run: |
           haxelib setup ~/haxelib
-          haxelib install lime 8.3.2 --quiet
           haxelib install openfl 9.3.3 --quiet
           haxelib install flixel 5.6.1 --quiet
           haxelib install flixel-addons 3.2.2 --quiet
           haxelib install hscript 2.5.0 --quiet
           haxelib install hxcpp --quiet
+
+      # Lime direto do git, porque o pacote do haxelib nao traz
+      # o codigo nativo nem o lime.ndll para ARM64
+      - name: Instalar Lime do git
+        run: |
+          haxelib git lime https://github.com/openfl/lime
+          cd "$(haxelib libpath lime)"
+          git submodule update --init --recursive
+
+      - name: Compilar lime nativo ARM64
+        run: |
+          haxelib run lime rebuild linux -arm64 -release
 
       - name: Verificar arquitetura
         run: |
@@ -104,9 +114,7 @@ jobs:
 
       - name: Compilar ARM64
         run: |
-          haxelib run lime build linux -final \
-            -D HXCPP_ARM64 \
-            -D HXCPP_LINUX_ARM64
+          haxelib run lime build linux -arm64 -final
 
       - name: Verificar binarios ARM64
         run: |
