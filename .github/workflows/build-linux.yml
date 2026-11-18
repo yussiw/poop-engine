@@ -1,3 +1,4 @@
+
 name: Build Linux
 
 on:
@@ -96,6 +97,7 @@ jobs:
           haxelib install hxcpp --quiet
           haxelib install format --quiet
           haxelib install hxp --quiet
+          haxelib install crossbyte --quiet
 
       # Lime direto do git, porque o pacote do haxelib nao traz
       # o codigo nativo nem o lime.ndll para ARM64
