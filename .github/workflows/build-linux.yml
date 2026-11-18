@@ -1,4 +1,6 @@
+
 name: Build Linux
+
 on:
   push:
   workflow_dispatch:
@@ -8,7 +10,18 @@ permissions:
 
 jobs:
   linux:
-    runs-on: ubuntu-22.04
+    name: Build Linux (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,7 +32,20 @@ jobs:
       - name: Dependencias do sistema
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ g++-multilib libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libx11-dev libxext-dev libxi-dev libxrandr-dev libxinerama-dev libpulse-dev libdbus-1-dev libudev-dev libopenal-dev
+          sudo apt-get install -y \
+            g++ \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libasound2-dev \
+            libx11-dev \
+            libxext-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libpulse-dev \
+            libdbus-1-dev \
+            libudev-dev \
+            libopenal-dev
 
       - name: Instalar libs
         run: |
@@ -34,20 +60,44 @@ jobs:
       - name: Compilar
         run: haxelib run lime build linux -final
 
-      - name: Empacotar (tar.gz mantem a permissao de executavel)
-        run: tar -czf PoopEngine-linux.tar.gz -C export/release/linux/bin .
+      - name: Empacotar
+        run: |
+          tar -czf "PoopEngine-linux-${{ matrix.arch }}.tar.gz" \
+            -C export/release/linux/bin .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PoopEngine-linux
-          path: PoopEngine-linux.tar.gz
+          name: PoopEngine-linux-${{ matrix.arch }}
+          path: PoopEngine-linux-${{ matrix.arch }}.tar.gz
 
-      - name: Publicar release (nightly-linux)
-        if: github.ref_name == github.event.repository.default_branch
+  release:
+    name: Publicar release
+    needs: linux
+    if: github.ref_name == github.event.repository.default_branch
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: PoopEngine-linux-*
+          merge-multiple: true
+
+      - name: Publicar nightly
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHORT=${GITHUB_SHA::7}
-          cp PoopEngine-linux.tar.gz "PoopEngine-linux-$SHORT.tar.gz"
+
           gh release delete nightly-linux --cleanup-tag --yes || true
-          gh release create nightly-linux "PoopEngine-linux-$SHORT.tar.gz" --target "$GITHUB_SHA" --title "Linux $SHORT" --notes "$(git log -1 --pretty=%s)" --prerelease
+
+          gh release create nightly-linux \
+            dist/PoopEngine-linux-x86_64.tar.gz \
+            dist/PoopEngine-linux-arm64.tar.gz \
+            --target "$GITHUB_SHA" \
+            --title "Linux $SHORT" \
+            --notes "$(git log -1 --pretty=%s)" \
+            --prerelease
