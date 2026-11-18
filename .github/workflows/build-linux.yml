@@ -78,7 +78,8 @@ jobs:
             libdbus-1-dev \
             libudev-dev \
             libopenal-dev \
-            binutils
+            binutils \
+            file
 
       - name: Verificar Haxe
         run: |
@@ -89,7 +90,7 @@ jobs:
       - name: Instalar libs
         run: |
           haxelib setup ~/haxelib
-          haxelib install lime 8.1.2 --quiet
+          haxelib install lime 8.3.2 --quiet
           haxelib install openfl 9.3.3 --quiet
           haxelib install flixel 5.6.1 --quiet
           haxelib install flixel-addons 3.2.2 --quiet
@@ -101,18 +102,20 @@ jobs:
           uname -m
           g++ -dumpmachine
 
-      - name: Reconstruir Lime ARM64
-        run: |
-          haxelib run lime rebuild cpp -64 -release -clean
-
       - name: Compilar ARM64
         run: |
-          haxelib run lime build linux -final
+          haxelib run lime build linux -final \
+            -D HXCPP_ARM64 \
+            -D HXCPP_LINUX_ARM64
 
       - name: Verificar binarios ARM64
         run: |
           file export/release/linux/bin/PoopEngine
           file export/release/linux/bin/lime.ndll
+
+          readelf -h export/release/linux/bin/PoopEngine
+          readelf -h export/release/linux/bin/lime.ndll
+
           readelf -h export/release/linux/bin/PoopEngine | grep -q "AArch64"
           readelf -h export/release/linux/bin/lime.ndll | grep -q "AArch64"
 
