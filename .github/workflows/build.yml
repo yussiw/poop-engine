@@ -9,6 +9,14 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: normal
+            flags: ""
+          - variant: tv
+            flags: "-armv7"
     steps:
       - uses: actions/checkout@v4
 
@@ -55,16 +63,30 @@ jobs:
             echo "::warning::Secret DEBUG_KEYSTORE_BASE64 nao definido: cada build sai com uma assinatura diferente e a atualizacao dentro do jogo vai falhar."
           fi
 
+      - name: Fix TV (linkar libatomic no armv7)
+        if: matrix.variant == 'tv'
+        run: |
+          python3 - <<'PY'
+          import re
+          p = 'source/Main.hx'
+          s = open(p).read()
+          tag = "@:buildXml('<target id=\"haxe\"><lib name=\"-latomic\" if=\"android\"/></target>')\n"
+          if 'buildXml' not in s:
+              s = re.sub(r'^class Main', lambda m: tag + 'class Main', s, count=1, flags=re.M)
+          open(p, 'w').write(s)
+          PY
+          grep -n buildXml source/Main.hx || { echo "::error::Nao achei 'class Main' em source/Main.hx"; exit 1; }
+
       - name: Compilar
-        run: haxelib run lime build android -final
+        run: haxelib run lime build android -final ${{ matrix.flags }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PoopEngine-apk
+          name: ${{ matrix.variant == 'tv' && 'PoopEngine-apk-tv' || 'PoopEngine-apk' }}
           path: export/release/android/bin/app/build/outputs/apk/**/*.apk
 
       - name: Publicar release (nightly) pra atualizacao dentro do jogo
-        if: github.ref_name == github.event.repository.default_branch
+        if: matrix.variant == 'normal' && github.ref_name == github.event.repository.default_branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
