@@ -1,3 +1,4 @@
+
 package;
 import flixel.FlxCamera;
 import flixel.FlxG;
@@ -40,20 +41,46 @@ class Controls {
 		#if !mobile
 		FlxG.mouse.getScreenPosition(getNeutralCam(), tmp);
 		pointer(-1, tmp.x, tmp.y, FlxG.mouse.justPressed, FlxG.mouse.pressed, FlxG.mouse.justReleased);
+		#end
+
+		// Teclado / direcional do controle remoto da TV box
 		var k = FlxG.keys.pressed;
-		if (k.D) now[0] = true;
-		if (k.F) now[1] = true;
-		if (k.J) now[2] = true;
-		if (k.K) now[3] = true;
+		if (k.D || k.LEFT) now[0] = true;
+		if (k.F || k.DOWN) now[1] = true;
+		if (k.J || k.UP) now[2] = true;
+		if (k.K || k.RIGHT) now[3] = true;
 		var j = FlxG.keys.justPressed;
 		if (j.DOWN) next = true;
 		if (j.UP) prev = true;
-		if (j.ENTER) {
+		if (j.LEFT) swipeLeft = true;
+		if (j.RIGHT) swipeRight = true;
+		if (j.ENTER || j.SPACE) {
 			tap = true;
 			tapX = FlxG.width / 2;
 			tapY = FlxG.height / 2;
 		}
+
+		// Gamepad (controle Bluetooth/USB)
+		#if FLX_GAMEPAD
+		var gp = FlxG.gamepads.lastActive;
+		if (gp != null) {
+			if (gp.pressed.DPAD_LEFT) now[0] = true;
+			if (gp.pressed.DPAD_DOWN) now[1] = true;
+			if (gp.pressed.DPAD_UP) now[2] = true;
+			if (gp.pressed.DPAD_RIGHT) now[3] = true;
+			if (gp.justPressed.DPAD_DOWN) next = true;
+			if (gp.justPressed.DPAD_UP) prev = true;
+			if (gp.justPressed.DPAD_LEFT) swipeLeft = true;
+			if (gp.justPressed.DPAD_RIGHT) swipeRight = true;
+			if (gp.justPressed.A || gp.justPressed.START) {
+				tap = true;
+				tapX = FlxG.width / 2;
+				tapY = FlxG.height / 2;
+			}
+			if (gp.justPressed.B) back = true;
+		}
 		#end
+
 		if (FlxG.keys.justPressed.ESCAPE)
 			back = true;
 		#if android
