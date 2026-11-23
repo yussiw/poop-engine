@@ -108,11 +108,11 @@
   "mods.metaError": "Não consegui ler o _polymod_meta.json:",
   "cat.debug": "debug",
   "opt.edChar": "Character Editor",
-  "opt.edChar.desc": "Editor de personagens. Em breve.",
+  "opt.edChar.desc": "Edita offsets, fps, loop, escala e animacao dos personagens. Escolha o personagem na tela.",
   "opt.edChart": "Chart Editor",
   "opt.edChart.desc": "Abre o editor de chart (escolha a música primeiro).",
   "opt.edStage": "Stage Editor",
   "opt.edStage.desc": "Editor de cenários. Em breve.",
   "opt.edScript": "HScript Editor",
-  "opt.edScript.desc": "Editor de scripts HScript. Em breve."
+  "opt.edScript.desc": "Escolha uma musica e escreva o script.hx dela, com cores no codigo."
 }

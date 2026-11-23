@@ -66,10 +66,10 @@ class Options {
 		register({id: "updGithub", category: "updates", type: "action", action: function() Updates.openRepo()});
 		infoPanels.set("updates", Updates.panelText);
 
-		register({id: "edChar", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ComingSoonState(function() return new states.OptionsState()))});
+		register({id: "edChar", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.CharacterEditorState())});
 		register({id: "edChart", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ChartPickState())});
 		register({id: "edStage", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ComingSoonState(function() return new states.OptionsState()))});
-		register({id: "edScript", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ComingSoonState(function() return new states.OptionsState()))});
+		register({id: "edScript", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.HScriptPickState())});
 	}
 
 	static function isLocale(t:String):Bool

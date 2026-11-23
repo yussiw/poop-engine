@@ -108,11 +108,11 @@
   "mods.metaError": "Could not read _polymod_meta.json:",
   "cat.debug": "debug",
   "opt.edChar": "Character Editor",
-  "opt.edChar.desc": "Character editor. Coming soon.",
+  "opt.edChar.desc": "Edit offsets, fps, loop, scale and animation of characters.",
   "opt.edChart": "Chart Editor",
   "opt.edChart.desc": "Opens the chart editor (pick a song first).",
   "opt.edStage": "Stage Editor",
   "opt.edStage.desc": "Stage editor. Coming soon.",
   "opt.edScript": "HScript Editor",
-  "opt.edScript.desc": "HScript editor. Coming soon."
+  "opt.edScript.desc": "Pick a song and write its script.hx, with syntax colors."
 }
