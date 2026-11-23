@@ -20,7 +20,7 @@ typedef OptionDef = {
 
 class Options {
 
-	public static var categories:Array<String> = ["gameplay", "graphics", "interface", "controls", "language", "updates"];
+	public static var categories:Array<String> = ["gameplay", "graphics", "interface", "controls", "language", "updates", "debug"];
 
 	public static var infoPanels:Map<String, Void->String> = new Map();
 	public static var defs:Array<OptionDef> = [];
@@ -60,11 +60,16 @@ class Options {
 
 		register({id: "language", category: "language", type: "choice", def: "pt-BR", choices: Lang.available});
 		register({id: "updCheck", category: "updates", type: "action", action: function() Updates.check()});
-		#if android
+		#if (android || windows)
 		register({id: "updInstall", category: "updates", type: "action", action: function() states.TransitionSubState.go(new states.UpdateState())});
 		#end
 		register({id: "updGithub", category: "updates", type: "action", action: function() Updates.openRepo()});
 		infoPanels.set("updates", Updates.panelText);
+
+		register({id: "edChar", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ComingSoonState(function() return new states.OptionsState()))});
+		register({id: "edChart", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ChartPickState())});
+		register({id: "edStage", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ComingSoonState(function() return new states.OptionsState()))});
+		register({id: "edScript", category: "debug", type: "action", action: function() states.TransitionSubState.go(new states.ComingSoonState(function() return new states.OptionsState()))});
 	}
 
 	static function isLocale(t:String):Bool

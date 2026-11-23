@@ -100,7 +100,7 @@ class ChartPickState extends FlxState {
 			change(-1);
 		if (Controls.swipeRight || Controls.back) {
 			FlxG.sound.play(Paths.sfx("menu/cancel"), 0.6);
-			TransitionSubState.go(new MainMenuState());
+			TransitionSubState.go(new OptionsState());
 			return;
 		}
 		if (Controls.tap) {

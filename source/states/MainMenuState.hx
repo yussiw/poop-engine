@@ -85,10 +85,6 @@ class MainMenuState extends FlxState {
 		versionTxt.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		versionTxt.y = FlxG.height - versionTxt.height - 4;
 		add(versionTxt);
-		var edTxt = new FlxText(10, 6, 0, Lang.get("menu.editor"), 18);
-		edTxt.scrollFactor.set();
-		edTxt.setFormat(Paths.font("vcr.ttf"), 18, 0xFF99FFBB, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		add(edTxt);
 		logBG = new FlxSprite(FlxG.width - 576, 4);
 		logBG.scrollFactor.set();
 		add(logBG);
@@ -201,10 +197,6 @@ class MainMenuState extends FlxState {
 		}
 		if (Controls.tap && Controls.tapX >= versionTxt.x && Controls.tapX <= versionTxt.x + versionTxt.width + 20 && Controls.tapY >= versionTxt.y - 10) {
 			TransitionSubState.go(new ModSelectState());
-			return;
-		}
-		if ((Controls.tap && Controls.tapX < 300 && Controls.tapY < 44) || FlxG.keys.justPressed.E) {
-			TransitionSubState.go(new ChartPickState());
 			return;
 		}
 		if (Controls.swipeLeft || FlxG.keys.justPressed.TAB) {
