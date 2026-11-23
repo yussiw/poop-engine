@@ -1,0 +1,117 @@
+{
+ "_nota": "Usa a imagem do bf espelhada. Quando tiver dad.xml, troque 'image' pra characters/dad e ajuste anims.",
+ "image": "characters/bf",
+ "icon": "dad",
+ "healthColor": [
+  175,
+  102,
+  206
+ ],
+ "idle": "idle",
+ "singSteps": 4,
+ "flipX": true,
+ "swapSing": true,
+ "scale": 1,
+ "anims": [
+  {
+   "name": "idle",
+   "prefix": "BF idle dance",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    -5,
+    0
+   ]
+  },
+  {
+   "name": "singLEFT",
+   "prefix": "BF NOTE LEFT0",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    12,
+    -6
+   ]
+  },
+  {
+   "name": "singDOWN",
+   "prefix": "BF NOTE DOWN0",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    -10,
+    -50
+   ]
+  },
+  {
+   "name": "singUP",
+   "prefix": "BF NOTE UP0",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    -29,
+    27
+   ]
+  },
+  {
+   "name": "singRIGHT",
+   "prefix": "BF NOTE RIGHT0",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    -38,
+    -7
+   ]
+  },
+  {
+   "name": "singLEFTmiss",
+   "prefix": "BF NOTE LEFT MISS",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    12,
+    24
+   ]
+  },
+  {
+   "name": "singDOWNmiss",
+   "prefix": "BF NOTE DOWN MISS",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    -11,
+    -19
+   ]
+  },
+  {
+   "name": "singUPmiss",
+   "prefix": "BF NOTE UP MISS",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    -29,
+    27
+   ]
+  },
+  {
+   "name": "singRIGHTmiss",
+   "prefix": "BF NOTE RIGHT MISS",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    -30,
+    21
+   ]
+  },
+  {
+   "name": "hey",
+   "prefix": "BF HEY!!",
+   "fps": 24,
+   "loop": false,
+   "offsets": [
+    7,
+    4
+   ]
+  }
+ ]
+}

@@ -1,0 +1,176 @@
+
+name: Build Linux
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    name: Build Linux x86_64
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.6
+
+      - name: Dependencias do sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ g++-multilib libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libx11-dev libxext-dev libxi-dev libxrandr-dev libxinerama-dev libpulse-dev libdbus-1-dev libudev-dev libopenal-dev
+
+      - name: Instalar libs
+        run: |
+          haxelib setup ~/haxelib
+          haxelib install lime 8.1.2 --quiet
+          haxelib install openfl 9.3.3 --quiet
+          haxelib install flixel 5.6.1 --quiet
+          haxelib install flixel-addons 3.2.2 --quiet
+          haxelib install hscript 2.5.0 --quiet
+          haxelib install hxcpp --quiet
+
+      - name: Compilar
+        run: haxelib run lime build linux -final
+
+      - name: Empacotar
+        run: |
+          tar -czf PoopEngine-linux-x86_64.tar.gz \
+            -C export/release/linux/bin .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: PoopEngine-linux-x86_64.tar.gz
+
+  linux-arm64:
+    name: Build Linux ARM64
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar ferramentas e dependencias
+        run: |
+          apt-get update
+          apt-get install -y \
+            haxe \
+            neko \
+            g++ \
+            make \
+            git \
+            ca-certificates \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libasound2-dev \
+            libx11-dev \
+            libxext-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libpulse-dev \
+            libdbus-1-dev \
+            libudev-dev \
+            libopenal-dev \
+            binutils \
+            file
+
+      - name: Verificar Haxe
+        run: |
+          haxe -version
+          haxelib version
+          test "$(haxe -version)" = "4.3.6"
+
+      - name: Instalar libs
+        run: |
+          haxelib setup ~/haxelib
+          haxelib install openfl 9.3.3 --quiet
+          haxelib install flixel 5.6.1 --quiet
+          haxelib install flixel-addons 3.2.2 --quiet
+          haxelib install hscript 2.5.0 --quiet
+          haxelib install hxcpp --quiet
+          haxelib install format --quiet
+          haxelib install hxp --quiet
+          haxelib install crossbyte --quiet
+
+      # Lime direto do git, porque o pacote do haxelib nao traz
+      # o codigo nativo nem o lime.ndll para ARM64
+      - name: Instalar Lime do git
+        run: |
+          haxelib git lime https://github.com/openfl/lime
+          cd "$(haxelib libpath lime)"
+          git submodule update --init --recursive
+
+      - name: Compilar lime nativo ARM64
+        run: |
+          haxelib run lime rebuild linux -arm64 -release
+
+      - name: Verificar arquitetura
+        run: |
+          uname -m
+          g++ -dumpmachine
+
+      - name: Compilar ARM64
+        run: |
+          haxelib run lime build linux -arm64 -final
+
+      - name: Verificar binarios ARM64
+        run: |
+          file export/release/linux/bin/PoopEngine
+          file export/release/linux/bin/lime.ndll
+
+          readelf -h export/release/linux/bin/PoopEngine
+          readelf -h export/release/linux/bin/lime.ndll
+
+          readelf -h export/release/linux/bin/PoopEngine | grep -q "AArch64"
+          readelf -h export/release/linux/bin/lime.ndll | grep -q "AArch64"
+
+      - name: Empacotar
+        run: |
+          tar -czf PoopEngine-linux-arm64.tar.gz \
+            -C export/release/linux/bin .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: PoopEngine-linux-arm64.tar.gz
+
+  release:
+    name: Publicar release
+    needs:
+      - linux-x86_64
+      - linux-arm64
+
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: linux-*
+          merge-multiple: true
+
+      - name: Publicar nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT=${GITHUB_SHA::7}
+
+          gh release delete nightly-linux --cleanup-tag --yes || true
+
+          gh release create nightly-linux \
+            dist/PoopEngine-linux-x86_64.tar.gz \
+            dist/PoopEngine-linux-arm64.tar.gz \
+            --target "$GITHUB_SHA" \
+            --title "Linux $SHORT" \
+            --notes "$(git log -1 --pretty=%s)" \
+            --prerelease

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+	<app title="Poop Engine" file="PoopEngine" packageName="com.poopengine.game" package="com.poopengine.game" main="Main" version="0.1.0" company="You" />
+	<app preloader="flixel.system.FlxPreloader" />
+	<icon path="icon.png" />
+	<set name="SWF_VERSION" value="11.8" />
+
+	<window width="1280" height="720" fps="60" background="#000000" hardware="true" vsync="false" />
+	<window if="mobile" orientation="landscape" fullscreen="true" resizable="false" />
+	<window if="desktop" fullscreen="false" resizable="true" />
+
+	<set name="BUILD_DIR" value="export/debug" if="debug" />
+	<set name="BUILD_DIR" value="export/release" unless="debug" />
+
+	<config:android target-sdk-version="34" if="android" />
+	<config:android minimum-sdk-version="21" if="android" />
+	<architecture name="arm64" if="android" />
+	<architecture name="armv7" if="android" />
+
+	<config:android permission="android.permission.INTERNET" if="android" />
+	<config:android permission="android.permission.ACCESS_NETWORK_STATE" if="android" />
+	<config:android permission="android.permission.WAKE_LOCK" if="android" />
+	<config:android permission="android.permission.VIBRATE" if="android" />
+	<config:android permission="android.permission.READ_EXTERNAL_STORAGE" if="android" />
+	<config:android permission="android.permission.WRITE_EXTERNAL_STORAGE" if="android" />
+	<config:android permission="android.permission.MANAGE_EXTERNAL_STORAGE" if="android" />
+	<config:android permission="android.permission.READ_MEDIA_IMAGES" if="android" />
+	<config:android permission="android.permission.READ_MEDIA_VIDEO" if="android" />
+	<config:android permission="android.permission.READ_MEDIA_AUDIO" if="android" />
+	<config:android permission="android.permission.REQUEST_INSTALL_PACKAGES" if="android" />
+	<java path="java" if="android" />
+
+	<classpath name="source" />
+	<assets path="assets" rename="assets" />
+
+	<haxelib name="flixel" />
+	<haxelib name="flixel-addons" />
+	<haxelib name="hscript" />
+	<haxelib name="extension-androidtools" if="android" />
+
+	<haxeflag name="-dce" value="no" />
+	<haxedef name="FLX_NO_DEBUG" unless="debug" />
+	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
+	<haxedef name="FLX_NO_SOUND_TRAY" if="mobile" />
+	<haxedef name="analyzer-optimize" unless="debug" />
+	<haxedef name="HXCPP_CHECK_POINTER" if="windows" />
+	<haxedef name="HXCPP_STACK_LINE" if="windows" />
+	<haxedef name="HXCPP_STACK_TRACE" if="windows" />
+</project>
