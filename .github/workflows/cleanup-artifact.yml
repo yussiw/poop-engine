@@ -1,10 +1,7 @@
-
 name: Cleanup old artifacts
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * 1"
 
 permissions:
   actions: write
@@ -14,7 +11,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Keep latest 2 artifacts per workflow
+      - name: Delete every artifact in this repository
         uses: actions/github-script@v7
         with:
           script: |
@@ -26,50 +23,17 @@ jobs:
               { owner, repo, per_page: 100 }
             );
 
-            const runs = new Map();
-            const groups = new Map();
-
-            for (const artifact of artifacts) {
-              const runId = artifact.workflow_run?.id;
-              if (!runId) continue;
-
-              let workflowId = runs.get(runId);
-
-              if (!workflowId) {
-                const run = await github.rest.actions.getWorkflowRun({
-                  owner, repo, run_id: runId
-                });
-
-                workflowId = run.data.workflow_id;
-                runs.set(runId, workflowId);
-              }
-
-              if (!groups.has(workflowId)) {
-                groups.set(workflowId, []);
-              }
-
-              groups.get(workflowId).push(artifact);
-            }
+            core.info(`Found ${artifacts.length} artifacts.`);
 
             let deleted = 0;
-
-            for (const [workflowId, items] of groups) {
-              items.sort((a, b) =>
-                new Date(b.created_at) - new Date(a.created_at)
-              );
-
-              for (const artifact of items.slice(2)) {
-                await github.rest.actions.deleteArtifact({
-                  owner,
-                  repo,
-                  artifact_id: artifact.id
-                });
-
-                deleted++;
-                core.info(`Deleted ${artifact.name} (${artifact.id})`);
-              }
-
-              core.info(`Workflow ${workflowId}: kept ${Math.min(2, items.length)} artifacts.`);
+            for (const artifact of artifacts) {
+              await github.rest.actions.deleteArtifact({
+                owner,
+                repo,
+                artifact_id: artifact.id
+              });
+              deleted++;
+              core.info(`Deleted ${artifact.name} (${artifact.id})`);
             }
 
-            core.info(`Cleanup finished. Deleted ${deleted} artifacts.`);
+            core.info(`Cleanup finished. Deleted ${deleted} of ${artifacts.length} artifacts.`);
